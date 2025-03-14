@@ -1,4 +1,6 @@
 # Ping_detection
+
+Main file to run from is script_clean.m
 This script analyzes an audio recording to detect specific sound events (triggers) based on a template trigger file. It:
 
 Loads the main audio file and the trigger template.
