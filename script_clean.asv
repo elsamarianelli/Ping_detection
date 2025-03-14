@@ -41,15 +41,15 @@ S_t_norm = abs(s_t) ./ max(sum(abs(s_t), 1), eps);  % Normalize trigger spectrog
 
 %% Find Dominant Frequencies in the Trigger
 [~, inds] = maxk(sum(S_t_norm, 2), N);              % Select top N strongest frequency bands
-top_freqs = f(inds);                                % Extract the corresponding frequency values
+top_freqs = f(inds);                    % Extract the corresponding frequency values
 
 %% Use These Frequency Bands to Analyze the Full Audio Signal
-top_freqs_mask = any(f == top_freqs', 2);           % Faster alternative to ismember()
+top_freqs_mask = any(f == top_freqs', 2); % Faster alternative to ismember()
 
 s_filt = S_norm(top_freqs_mask, :); % Extract spectrogram data for dominant frequencies
 avg_power = mean(s_filt, 1) / max(mean(s_filt, 1)); % Compute and normalize mean power time series
 
-smth_pow = imgaussfilt(avg_power, sigma);           % Smooth the final power series
+smth_pow = imgaussfilt(avg_power, sigma); % Smooth the final power series
 
 %% Generate an interactive plot to set the threshold
 % remember when you press outside the x axis you have to make sure to do it
@@ -72,10 +72,10 @@ while go_on
 end
 close, clear go_on x
 
-%% Visualise to check correct pings being taken
-start_time =1;                                % change this to skip over talking bits
+%% visialise to check correct pings being taken
+start_time =1; % change this to skip over talking bits
 playback_with_cursor(yS, Fs, t, smth_pow, start_time, thresh)
-stop(player);                                 % Stop playback when finished
+stop(player); % Stop playback when finished
 
 %% Save the output
 [~,root]        = fileparts(dataFile);
