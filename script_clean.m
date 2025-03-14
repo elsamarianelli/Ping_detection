@@ -1,7 +1,6 @@
 %% Code to extract audio triggers from video data for Davide
 %  Written by Elsa Marianelli, edited by Daniel Bush (2025)
 
-
 %% Set some parameters
 % dataFold        = 'D:\Data\Davide Project\';                % Data path 
 % dataFold        = '/Users/elsamarianelli/Documents/audio_pip_task'; % on laptop
@@ -14,7 +13,6 @@ overlap_length  = 256;                                      % Length of overlap 
 freqLim         = 600;                                      % Lower frequency limit (Hz)
 N               = 5;                                        % Number of dominant frequencies to identify
 sigma           = 18;                                       % Standard deviation for Gaussian filter (samples)
-
 
 %%  Import the audio
 [yS, Fs]        = audioread([dataFold filesep dataFile]);   % Import audio data, sampling frequency (Hz)
@@ -29,42 +27,33 @@ yS_p            = yS_p(:,1);
 [s_t, f_t]  = spectrogram(yS_p, window_length, overlap_length, [], Fs_p); 
 
 %% Remove Frequencies Below 600 Hz
-freqLim     = 600; % Cutoff frequency
+freqLim = 600; % Cutoff frequency
 
-valid_f     = f > freqLim;   % Logical mask for frequencies above 600 Hz
-valid_f_t   = f_t > freqLim; % Same for trigger spectrogram
-
-s           = s(valid_f, :);   % Apply mask to full audio spectrogram
-f           = f(valid_f);      % Update frequency vector
-
-s_t         = s_t(valid_f_t, :); % Apply mask to trigger spectrogram
-f_t         = f_t(valid_f_t);    % Update trigger frequency vector
+valid_f = f > freqLim;  % Logical mask for frequencies above 600 Hz
+s = s(valid_f, :);      % Apply mask to full audio spectrogram
+f = f(valid_f);         % Update frequency vector
+s_t = s_t(valid_f, :);  % Apply mask to trigger spectrogram
+f_t = f;                % Since f_t is now the same filtered range
 
 %% Normalize Each Column (Time Step) in Both Spectrograms
-% Normalize full spectrogram
-S_norm = abs(s); % Convert to magnitude
-S_norm = S_norm ./ sum(S_norm, 1); % Normalize each column to sum to 1
-S_norm(:, sum(S_norm,1) == 0) = 0; % Avoid NaN issues
-
-% Normalize trigger spectrogram
-S_t_norm = abs(s_t);
-S_t_norm = S_t_norm ./ sum(S_t_norm, 1);
-S_t_norm(:, sum(S_t_norm,1) == 0) = 0;
+S_norm = abs(s) ./ max(sum(abs(s), 1), eps); % Normalize full spectrogram, avoiding division by zero
+S_t_norm = abs(s_t) ./ max(sum(abs(s_t), 1), eps); % Normalize trigger spectrogram, avoiding NaNs
 
 %% Find Dominant Frequencies in the Trigger
-p_t             = sum(S_t_norm, 2); % Total power per frequency band
-[~, inds]       = sort(p_t, 'descend'); % Sort by strongest components
-top_freqs       = f_t(inds(1:N)); % Select top N frequency bands
+[~, inds] = maxk(sum(S_t_norm, 2), N); % Select top N strongest frequency bands
+top_freqs = f(inds); % Extract the corresponding frequency values
 
 %% Use These Frequency Bands to Analyze the Full Audio Signal
-top_freqs_mask  = ismember(f, top_freqs); % Create mask for selected frequencies
+top_freqs_mask = any(f == top_freqs', 2); % Faster alternative to ismember()
 
-s_filt          = S_norm(top_freqs_mask, :); % Extract data for dominant frequencies
-avg_power       = mean(s_filt, 1); % Compute mean power time series
-avg_power       = avg_power / max(avg_power); % Normalize power
+s_filt = S_norm(top_freqs_mask, :); % Extract spectrogram data for dominant frequencies
+avg_power = mean(s_filt, 1) / max(mean(s_filt, 1)); % Compute and normalize mean power time series
 
-smth_pow        = imgaussfilt(avg_power, sigma); % Smooth the final power series
+smth_pow = imgaussfilt(avg_power, sigma); % Smooth the final power series
+
 %% Generate an interactive plot to set the threshold
+% remember when you press outside the x axis you have to make sure to do it
+% inline with where you want the threshold to be.
 figure;
 go_on           = true;
 thresh          = 0.34;
@@ -82,8 +71,9 @@ while go_on
     end    
 end
 close, clear go_on x
-%% visialise to check correct pings being taken.
-start_time =1; 
+
+%% visialise to check correct pings being taken
+start_time =1; % change this to skip over talking bits
 playback_with_cursor(yS, Fs, t, smth_pow, start_time, thresh)
 stop(player); % Stop playback when finished
 
