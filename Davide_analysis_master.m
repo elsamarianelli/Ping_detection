@@ -23,7 +23,7 @@ ft_databrowser(cfg, data_avg);
 % excel file 
 trigTimes = extract_trigger_times(audio); % save trigger times as excel file
                                           % alternatively extract presaved trig times
-trigTable = readtable('audio_vid_72-triggerTimes.csv');
+trigTable = readtable('audio_vid_76-triggerTimes.csv');
 trigTimes_sec = trigTable.TriggerTimes;   % seconds
 
 % check that the trig times aline with the data from a random channel
