@@ -1,0 +1,51 @@
+function playback_with_cursor_new(yS, Fs, t, smth_pow, start_time, thresh)
+    player = audioplayer(yS, Fs);
+    speed_factor = 1;    % initial playback speed
+    running = true;
+
+    % Set up figure with keypress callback
+    hFig = figure;
+    set(hFig, 'KeyPressFcn', @keyPressCallback);
+
+    % Play audio and show cursor
+    current_time = start_time;
+    while current_time < t(end) && running
+        % Plot cursor
+        plot(t, smth_pow, 'b', 'LineWidth', 1.5), hold on
+        plot(t, thresh * ones(size(t)), 'r--')
+        plot(current_time * ones(size(t)), smth_pow, 'g--')
+        hold off
+        xlabel('Time (s)'), ylabel('Smoothed Trigger Power')
+        title('check when the experiment starts (< > to adjust speed, down to stop)')
+
+        % Play short audio segment (for demo, say 0.1s chunks)
+        segment_samples = round(Fs * 0.1);
+        if current_time * Fs + segment_samples <= length(yS)
+            startSample = max(1, round(current_time * Fs));
+            endSample = min(length(yS), startSample + segment_samples);
+            play(player, [startSample endSample]);
+
+        end
+
+        pause(0.1 / speed_factor);  % wait scaled by speed
+        current_time = current_time + 0.1 * speed_factor;
+    end
+
+    stop(player);
+    close(hFig);
+
+    % Keypress callback function
+    function keyPressCallback(~, event)
+        switch event.Key
+            case 'rightarrow'
+                speed_factor = speed_factor * 1.5;  % speed up
+                disp(['Speed: ' num2str(speed_factor) 'x']);
+            case 'leftarrow'
+                speed_factor = speed_factor / 1.5;  % slow down
+                disp(['Speed: ' num2str(speed_factor) 'x']);
+            case 'downarrow'
+                running = false;  % stop playback
+                disp('Stopping playback.');
+        end
+    end
+end

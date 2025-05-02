@@ -1,6 +1,6 @@
 %% Code to extract audio triggers from video data for Davide
 %  Written by Elsa Marianelli, edited by Daniel Bush (2025)
-function [] = extract_trigger_times(dataFile)
+
 %% Set some parameters
 % dataFold        = 'D:\Data\Davide Project\';                % Data path 
 % dataFold        = '/Users/elsamarianelli/Documents/audio_pip_task'; % on laptop
