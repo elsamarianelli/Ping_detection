@@ -1,12 +1,12 @@
 %% Code to extract audio triggers from video data for Davide
 %  Written by Elsa Marianelli, edited by Daniel Bush (2025)
-function [trigs] = extract_trigger_times(dataFile)
+
 %% Set some parameters
 % dataFold        = 'D:\Data\Davide Project\';                % Data path 
 % dataFold        = '/Users/elsamarianelli/Documents/audio_pip_task'; % on laptop
-dataFold        = 'C:\Users\Elsa Marianelli\Documents\GitHub\DAVIDE_data_and_docs';% on work computer 
+dataFold        = 'C:\Users\Elsa Marianelli\Documents\GitHub\DAVIDE_audio_data';% on work computer 
 
-% dataFile        = 'audio_vid_76.wav';                       % Audio file
+dataFile        = 'audio_vid_76.wav';                       % Audio file
 trigFile        = 'actual_ping_shorter.wav';                % Template audio trigger
 window_length   = 512;                                      % Length of the window for FFT
 overlap_length  = 256;                                      % Length of overlap between windows
@@ -55,68 +55,29 @@ smth_pow = imgaussfilt(avg_power, sigma);           % Smooth the final power ser
 % remember when you press outside the x axis you have to make sure to do it
 % inline with where you want the threshold to be.
 figure;
-
-% ---- Step 1: Set Y-axis threshold ----
-go_on = true;
-thresh_y = 0.34;
-
+go_on           = true;
+thresh          = 0.34;
 while go_on
     plot(t, smth_pow, 'b', 'LineWidth', 1.5), hold on
-    plot(t, thresh_y * ones(size(t)), 'r--')
-    trigs = regionprops(smth_pow > thresh_y, 'PixelIdxList');
-    trigs = cellfun(@(x) t(min(x)), {trigs(:).PixelIdxList});
-    scatter(trigs, thresh_y * ones(size(trigs)), 500, 'r.'), hold off
-    xlabel('Time (s)', 'FontSize', 24), ylabel('Smoothed Trigger Power (au)'), grid on
-    title('Select threshold for trigger sounds by right clicking outside y axis')
-    [x, thresh_y] = ginput(1);
-    if x < min(t) || x > max(t)
-        go_on = false;
-    end
+    plot(t,thresh*ones(size(t)),'r--')
+    trigs       = regionprops(smth_pow>thresh,'PixelIdxList');
+    trigs       = cellfun(@(x) t(min(x)),{trigs(:).PixelIdxList});
+    scatter(trigs,thresh*ones(size(trigs)),500,'r.'), hold off    
+    xlabel('Time (s)','FontSize',24), ylabel('Smoothed Trigger Power (au)'), grid on
+    title('Click outside the x-axis to accept trigger times')
+    [x,thresh]  = ginput(1);
+    if x<min(t) || x>max(t)
+        go_on   = false;
+    end    
 end
+close, clear go_on x
 
-% Apply Y threshold
-trigs = regionprops(smth_pow > thresh_y, 'PixelIdxList');
-trigs = cellfun(@(x) t(min(x)), {trigs(:).PixelIdxList});
-thresh = thresh_y;
 %% Visualise to check correct pings being taken
-start_time = 1;                              % change this to skip over talking bits
-playback_with_cursor_new(yS, Fs, t, smth_pow, start_time, thresh)
+start_time =1590;                                % change this to skip over talking bits
+playback_with_cursor(yS, Fs, t, smth_pow, start_time, thresh)
+stop(player);                                 % Stop playback when finished
 
-%% then have the option to threshold in the x axis to remove talking bits 
-% ---- Step 2: Set X-axis threshold ----
-go_on = true;
-thresh_x = min(t);  % default to start of time
-
-while go_on
-    plot(t, smth_pow, 'b', 'LineWidth', 1.5), hold on
-    plot(t, thresh_y * ones(size(t)), 'r--')   % keep Y threshold line
-    plot(thresh_x * ones(size(smth_pow)), smth_pow, 'g--')  % X threshold line
-    scatter(trigs, thresh_y * ones(size(trigs)), 500, 'r.'), hold off
-    xlabel('Time (s)', 'FontSize', 24), ylabel('Smoothed Trigger Power (au)'), grid on
-    title('Select threshold for when experiment starts by right clicking outside x axis')
-    [thresh_x, y] = ginput(1);
-    if y < min(smth_pow) || y > max(smth_pow)
-        go_on = false;
-    end
-end
-
-% Filter triggers based on X threshold
-trigs = trigs(trigs >= thresh_x);
-trigs = unique(round(trigs, 3));  % round to milliseconds + unique
-
-close, clear go_on x y
-
-%% Option to save the output
-save_response = questdlg('Do you want to save the trigger times to Excel?', ...
-    'Save Confirmation', 'Yes', 'No', 'Yes');
-
-if strcmp(save_response, 'Yes')
-    [~,root] = fileparts(dataFile);
-    T = array2table(trigs','VariableNames',{'TriggerTimes'});
-    writetable(T,[root '-triggerTimes.csv']);
-    disp('Trigger times saved.');
-else
-    disp('Save cancelled. No file was written.');
-end
-
-end
+%% Save the output
+[~,root]        = fileparts(dataFile);
+T               = array2table(trigs','VariableNames',{'TriggerTimes'});
+writetable(T,[root '-triggerTimes.csv']); clear T root

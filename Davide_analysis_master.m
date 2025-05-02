@@ -1,8 +1,8 @@
 %% [1] load data and get trigger times
 
 % set audio data pair 
-data_file = 'EEG_71.TRC';
-audio = 'audio_vid_72.wav';
+data_file = 'EEG_75.TRC';
+audio = 'audio_vid_76.wav';
 
 % load data in field trip format
 path = 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/';
@@ -14,12 +14,26 @@ cfg.refmethod = 'avg'; % not sure which method to use
 cfg.refchannel = 'all';
 data_avg = ft_preprocessing(cfg);
 
+% checking different channels...use to look for possible trigger file? 
+cfg = [];
+cfg.channel = 'MKR1+'; % trigger channel?
+ft_databrowser(cfg, data_avg);
+
 % select trigger times from corresponding audio by thresholding and save as
 % excel file 
 trigTimes = extract_trigger_times(audio); % save trigger times as excel file
                                           % alternatively extract presaved trig times
 trigTable = readtable('audio_vid_72-triggerTimes.csv');
 trigTimes_sec = trigTable.TriggerTimes;   % seconds
+
+% check that the trig times aline with the data from a random channel
+nSamples = size(data_avg.trial{1}, 2);
+channel_check = data_avg.trial{1}(1, :); 
+figure;
+plot(1:nSamples, channel_check)
+hold on; 
+trigger_array = zeros(1, nSamples); trigger_array(trigSamples) =1000;
+plot(1:nSamples, trigger_array(1,1:nSamples), 'r'); hold off
 
 %% [2] Epoch data
 
