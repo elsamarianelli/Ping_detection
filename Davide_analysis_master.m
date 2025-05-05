@@ -1,39 +1,30 @@
 %% [1] load data and get trigger times
 
 % set audio data pair 
-data_file = 'EEG_75.TRC';
-audio = 'audio_vid_76.wav';
+data_file = 'EEG_71.TRC';
+audio = 'audio_vid_72.wav';
 
 % load data in field trip format
-path = 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/';
+path = 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/'; % work comp
+path = '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs'; % laptop
 cfg = [];
 cfg.dataset = data_file;
 cfg.channel = 'all'; 
-cfg.reref = 'yes';  % re-referencing?
-cfg.refmethod = 'avg'; % not sure which method to use
-cfg.refchannel = 'all';
-data_avg = ft_preprocessing(cfg);
+% cfg.reref = 'yes';  % re-referencing?
+% cfg.refmethod = 'avg'; % not sure which method to use
+% cfg.refchannel = 'all';
+data_FT = ft_preprocessing(cfg);
 
 % checking different channels...use to look for possible trigger file? 
-cfg = [];
-cfg.channel = 'MKR1+'; % trigger channel?
-ft_databrowser(cfg, data_avg);
+% cfg.channel = 'MKR1+'; % trigger channel?
+% ft_databrowser(cfg, data_FT);
 
 % select trigger times from corresponding audio by thresholding and save as
 % excel file 
-trigTimes = extract_trigger_times(audio); % save trigger times as excel file
+trigTimes_sec = extract_trigger_times(audio); % save trigger times as excel file
                                           % alternatively extract presaved trig times
-trigTable = readtable('audio_vid_76-triggerTimes.csv');
-trigTimes_sec = trigTable.TriggerTimes;   % seconds
-
-% check that the trig times aline with the data from a random channel
-nSamples = size(data_avg.trial{1}, 2);
-channel_check = data_avg.trial{1}(1, :); 
-figure;
-plot(1:nSamples, channel_check)
-hold on; 
-trigger_array = zeros(1, nSamples); trigger_array(trigSamples) =1000;
-plot(1:nSamples, trigger_array(1,1:nSamples), 'r'); hold off
+% trigTable = readtable('audio_vid_72-triggerTimes.csv');
+% trigTimes_sec = trigTable.TriggerTimes;   % seconds
 
 %% [2] Epoch data
 
@@ -45,6 +36,9 @@ secs_after= 1;    % seconds after
 trigSamples = round(trigTimes_sec * data_FT.fsample);
 pretrig = round(secs_before * data_FT.fsample);   
 posttrig = round(secs_after * data_FT.fsample); 
+
+% check that the trig times aline with the data from a random channel?
+plot_EEG_with_triggers(data_FT, trigSamples)
 
 % generate trial input to cfg for field trip epoching
 begsample = trigSamples - pretrig;
@@ -80,3 +74,4 @@ behav_impairments_data = ft_selectdata(cfg, data_epoched);
 
 cfg.channel = all_in_IFOF;
 all_in_IFOF_data = ft_selectdata(cfg, data_epoched);
+

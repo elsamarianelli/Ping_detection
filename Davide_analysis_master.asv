@@ -1,39 +1,30 @@
 %% [1] load data and get trigger times
 
 % set audio data pair 
-data_file = 'EEG_75.TRC';
-audio = 'audio_vid_76.wav';
+data_file = 'EEG_71.TRC';
+audio = 'audio_vid_72.wav';
 
 % load data in field trip format
-path = 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/';
+path = 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/'; % work comp
+path = '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs'; % laptop
 cfg = [];
 cfg.dataset = data_file;
 cfg.channel = 'all'; 
-cfg.reref = 'yes';  % re-referencing?
-cfg.refmethod = 'avg'; % not sure which method to use
-cfg.refchannel = 'all';
-data_avg = ft_preprocessing(cfg);
+% cfg.reref = 'yes';  % re-referencing?
+% cfg.refmethod = 'avg'; % not sure which method to use
+% cfg.refchannel = 'all';
+data_FT = ft_preprocessing(cfg);
 
 % checking different channels...use to look for possible trigger file? 
-cfg = [];
 cfg.channel = 'MKR1+'; % trigger channel?
-ft_databrowser(cfg, data_avg);
+ft_databrowser(cfg, data_FT);
 
 % select trigger times from corresponding audio by thresholding and save as
 % excel file 
-trigTimes = extract_trigger_times(audio); % save trigger times as excel file
+trigTimes_sec = extract_trigger_times(audio); % save trigger times as excel file
                                           % alternatively extract presaved trig times
-trigTable = readtable('audio_vid_72-triggerTimes.csv');
-trigTimes_sec = trigTable.TriggerTimes;   % seconds
-
-% check that the trig times aline with the data from a random channel
-nSamples = size(data_avg.trial{1}, 2);
-channel_check = data_avg.trial{1}(1, :); 
-figure;
-plot(1:nSamples, channel_check)
-hold on; 
-trigger_array = zeros(1, nSamples); trigger_array(trigSamples) =1000;
-plot(1:nSamples, trigger_array(1,1:nSamples), 'r'); hold off
+% trigTable = readtable('audio_vid_72-triggerTimes.csv');
+% trigTimes_sec = trigTable.TriggerTimes;   % seconds
 
 %% [2] Epoch data
 
@@ -45,6 +36,9 @@ secs_after= 1;    % seconds after
 trigSamples = round(trigTimes_sec * data_FT.fsample);
 pretrig = round(secs_before * data_FT.fsample);   
 posttrig = round(secs_after * data_FT.fsample); 
+
+% check that the trig times aline with the data from a random channel?
+plot_EEG_with_triggers(data_FT, trigSamples)
 
 % generate trial input to cfg for field trip epoching
 begsample = trigSamples - pretrig;
@@ -80,3 +74,44 @@ behav_impairments_data = ft_selectdata(cfg, data_epoched);
 
 cfg.channel = all_in_IFOF;
 all_in_IFOF_data = ft_selectdata(cfg, data_epoched);
+
+%%
+% Define channel groups
+group1_labels = {'Am3', 'Am4', 'aIn4', 'aIn5', 'IFG4', 'IFG5', 'IFG6', 'IFG7'};
+group2_labels = {'Am3', 'Am4', 'aIn3', 'aIn4', 'aIn5', 'aIn6', 'aIn7', ...
+                 'LpSM3', 'LpSM4', 'LaC3', 'LaC4', 'LaC5', ...
+                 'IFG2', 'IFG3', 'IFG4', 'IFG5', 'IFG6', ...
+                 'mOF3', 'mOF4', 'mOF5', 'mOF6', 'mOF7', 'mOF8', 'mOF9'};
+groupAF_labels = {'pC6', 'pC7'};
+
+% Select data per group
+cfg = [];
+cfg.channel = group1_labels;
+data_group1 = ft_selectdata(cfg, data_epoched);
+
+cfg.channel = group2_labels;
+data_group2 = ft_selectdata(cfg, data_epoched);
+
+cfg.channel = groupAF_labels;
+data_groupAF = ft_selectdata(cfg, data_epoched);
+
+% Compute trial averages
+cfg = [];
+avg_group1 = ft_timelockanalysis(cfg, data_group1);
+avg_group2 = ft_timelockanalysis(cfg, data_group2);
+avg_groupAF = ft_timelockanalysis(cfg, data_groupAF);
+
+% Plot average waveforms for each group
+cfg = [];
+cfg.layout = 'ordered'; % simple grid layout (works without head model)
+
+figure;
+ft_multiplotER(cfg, avg_group1, avg_group2, avg_groupAF);
+legend({'Group1: Behav Impair', 'Group2: IFOF BARD', 'Group3: AF BARD'});
+
+% Optional: plot single channel example
+cfg = [];
+cfg.channel = 'Am3';  % or any channel you want
+figure;
+ft_singleplotER(cfg, avg_group1, avg_group2, avg_groupAF);
+legend({'Group1', 'Group2', 'Group3'});

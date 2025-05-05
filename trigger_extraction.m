@@ -6,7 +6,7 @@
 % dataFold        = '/Users/elsamarianelli/Documents/audio_pip_task'; % on laptop
 dataFold        = 'C:\Users\Elsa Marianelli\Documents\GitHub\DAVIDE_data_and_docs';% on work computer 
 
-dataFile        = 'audio_vid_76.wav';                       % Audio file
+dataFile        = 'audio_vid_72.wav';                       % Audio file
 trigFile        = 'actual_ping_shorter.wav';                % Template audio trigger
 window_length   = 512;                                      % Length of the window for FFT
 overlap_length  = 256;                                      % Length of overlap between windows
@@ -27,7 +27,7 @@ yS_p            = yS_p(:,1);
 [s_t, f_t]  = spectrogram(yS_p, window_length, overlap_length, [], Fs_p); 
 
 %% Remove Frequencies Below 600 Hz
-freqLim = 600; % Cutoff frequency
+freqLim = 0; % Cutoff frequency
 
 valid_f = f > freqLim;  % Logical mask for frequencies above 600 Hz
 s = s(valid_f, :);      % Apply mask to full audio spectrogram

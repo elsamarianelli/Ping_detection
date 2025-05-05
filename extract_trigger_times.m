@@ -4,8 +4,8 @@ function [trigs] = extract_trigger_times(dataFile)
 %% Set some parameters
 % dataFold        = 'D:\Data\Davide Project\';                % Data path 
 % dataFold        = '/Users/elsamarianelli/Documents/audio_pip_task'; % on laptop
-dataFold        = 'C:\Users\Elsa Marianelli\Documents\GitHub\DAVIDE_data_and_docs';% on work computer 
-
+% dataFold        = 'C:\Users\Elsa Marianelli\Documents\GitHub\DAVIDE_data_and_docs';% on work computer 
+dataFold        = '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs'; % laptop
 % dataFile        = 'audio_vid_76.wav';                       % Audio file
 trigFile        = 'actual_ping_shorter.wav';                % Template audio trigger
 window_length   = 512;                                      % Length of the window for FFT
@@ -15,19 +15,23 @@ N               = 5;                                        % Number of dominant
 sigma           = 18;                                       % Standard deviation for Gaussian filter (samples)
 
 %%  Import the audio
+%   Full video audio
 [yS, Fs]        = audioread([dataFold filesep dataFile]);   % Import audio data, sampling frequency (Hz)
 yS              = yS(:,1);                                  % Extract left audio channel
 
-%  Import the template trigger
+%  Import the template trigger - ping noise
 [yS_p, Fs_p]    = audioread([dataFold filesep trigFile]);
 yS_p            = yS_p(:,1); 
 
 %% Compute spectrograms
-[s, f, t]   = spectrogram(yS, window_length, overlap_length, [], Fs); 
-[s_t, f_t]  = spectrogram(yS_p, window_length, overlap_length, [], Fs_p); 
+%  (f) - vector of frequencies
+%  (t) - vector of times
+%  at which the spectrogram (s) is computed
+[s, f, t]   = spectrogram(yS, window_length, overlap_length, [], Fs);  % full audio spectogram
+[s_t, f_t]  = spectrogram(yS_p, window_length, overlap_length, [], Fs_p); % ping spectrogram
 
 %% Remove Frequencies Below 600 Hz
-freqLim = 600; % Cutoff frequency
+freqLim = 600;          % Cutoff frequency
 
 valid_f = f > freqLim;  % Logical mask for frequencies above 600 Hz
 s = s(valid_f, :);      % Apply mask to full audio spectrogram
