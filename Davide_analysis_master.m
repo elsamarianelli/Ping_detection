@@ -1,77 +1,88 @@
-%% [1] load data and get trigger times
+%% [1] load data and put into field trip to visualise 
+% get paths 
+path = 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/';                  % work comp
+addpath 'C:/Users/Elsa Marianelli/Documents/GitHub/DAVIDE_data_and_docs/';           % work comp
+% path = '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs';      % laptop 
+restoredefaultpath
+addpath 'C:\Users\Elsa Marianelli\Documents\GitHub\fieldtrip';
 
-% set audio data pair 
-data_file = 'EEG_71.TRC';
-audio = 'audio_vid_72.wav';
+% set audio data pair (list in word doc)
+EEG_code   = 'EEG_75';
+data_file  = [EEG_code '.TRC'];
+audio      = 'audio_vid_76.wav';
 
-% load data in field trip format
-path = 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/'; % work comp
-path = '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs'; % laptop
-cfg = [];
-cfg.dataset = data_file;
-cfg.channel = 'all'; 
-% cfg.reref = 'yes';  % re-referencing?
-% cfg.refmethod = 'avg'; % not sure which method to use
-% cfg.refchannel = 'all';
-data_FT = ft_preprocessing(cfg);
+% configure
+cfg             = [];
+cfg.dataset     = data_file;
+cfg.channel     = 'all';
+data_FT        = ft_preprocessing(cfg);
 
-% checking different channels...use to look for possible trigger file? 
-% cfg.channel = 'MKR1+'; % trigger channel?
-% ft_databrowser(cfg, data_FT);
+% anonymise patient info!!
+data_FT.hdr.orig.name        = 'anon';
+data_FT.hdr.orig.surname     = 'anon';
+data_FT.hdr.subjectname      = 'anon';
 
-% select trigger times from corresponding audio by thresholding and save as
-% excel file 
-trigTimes_sec = extract_trigger_times(audio); % save trigger times as excel file
-                                          % alternatively extract presaved trig times
-% trigTable = readtable('audio_vid_72-triggerTimes.csv');
-% trigTimes_sec = trigTable.TriggerTimes;   % seconds
+% checking different channels - MRK1+ has 1s time steps for a full cycle as reference
+cfg.channel     = 'MKR1+';
+ft_databrowser(cfg, data_FT);
 
-%% [2] Epoch data
+%% [2] extract trigger times and stimulation times to save
 
-% set trail segmenting parameters 
-secs_before = .5; % seconds before
-secs_after= 1;    % seconds after
+% i) Trigger times (pings)
+trigTimes       = extract_trigger_times(audio);          % save trigger times as excel file
+% trigTable     = readtable('audio_vid_72-triggerTimes.csv'); % alternatively extract presaved trig times
+% trigTimes    = trigTable.TriggerTimes;
 
-% convert to EEG sampling frequency/ pre and post trial times to time stamps
-trigSamples = round(trigTimes_sec * data_FT.fsample);
-pretrig = round(secs_before * data_FT.fsample);   
-posttrig = round(secs_after * data_FT.fsample); 
+% ii) stimulation times 
+ex_channel_trace = data_FT.trial{1}(3,:);               % example trace to use - it looks like they all have similar activity
+                                                        % in this set but check for different EEG files
 
-% check that the trig times aline with the data from a random channel?
+% Get start and stop times for stimulation periods (with plot to check if threshold is ok) 
+threshold                    = 200;                     % threshold for what constitutes a stimulation period
+merge_gap_sec                = 2;
+[stimTimes, artifact_matrix] = extract_stim_clusters(ex_channel_trace, data_FT.time{1}, data_FT.fsample, threshold, merge_gap_sec);
+
+% option to save as excel file for later use...
+save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
+
+%% [3] Epoch data - using extracted ping times
+
+% get cfg trial format
+time_before_ping = 0.5;                                % for trial lengths
+time_after_ping  = 0.5;
+cfg              = make_trial_cfg(trigTimes, data_FT, time_before_ping, time_after_ping);
+
+% check that the trig times align with the data from a random channel...
 plot_EEG_with_triggers(data_FT, trigSamples)
+data_epoched    = ft_preprocessing(cfg);
 
-% generate trial input to cfg for field trip epoching
-begsample = trigSamples - pretrig;
-endsample = trigSamples + posttrig - 1;
-offset = -pretrig * ones(size(trigSamples));
-trl = [begsample, endsample, offset];
-cfg.trl = trl;
+% check
+cfg             = [];
+cfg.viewmode    = 'vertical';                         % classic EEG trace view
+cfg.channel     = 'all';                              % or a subset like {'Am3', 'Am4'}
+cfg.trials      = 1;                                  % show all trials (default)
+ft_databrowser(cfg, data_epoched);
 
-% process data with trial epochs 
-data_epoched = ft_preprocessing(cfg);
+%% [4] Separate data based on contacts with behavioural impairment vs all contacts in IFOF
 
-%% [4] define the contacts of interest and seperate data accordingly
-
-%contacts with behavioural impariments in IFOF
+% contacts with behavioural impairments in IFOF
 behav_impairments = {'Am3', 'Am4', 'aIn4', 'aIn5', 'IFG4', 'IFG5', 'IFG6', 'IFG7'};
 
 % BARD contacts in IFOF
-all_in_IFOF = {'Am3', 'Am4', ...
-                 'aIn3', 'aIn4', 'aIn5', 'aIn6', 'aIn7', ...
-                 'LpSM3', 'LpSM4', ...
-                 'LaC3', 'LaC4', 'LaC5', ...
-                 'IFG2', 'IFG3', 'IFG4', 'IFG5', 'IFG6', ...
-                 'mOF3', 'mOF4', 'mOF5', 'mOF6', 'mOF7', 'mOF8', 'mOF9'};
+all_in_IFOF      = {'Am3', 'Am4', ...
+                    'aIn3', 'aIn4', 'aIn5', 'aIn6', 'aIn7', ...
+                    'LpSM3', 'LpSM4', ...
+                    'LaC3', 'LaC4', 'LaC5', ...
+                    'IFG2', 'IFG3', 'IFG4', 'IFG5', 'IFG6', ...
+                    'mOF3', 'mOF4', 'mOF5', 'mOF6', 'mOF7', 'mOF8', 'mOF9'};
 
 % BARD contacts in AF?
-in_AF = {'pC6', 'pC7'};
+in_AF            = {'pC6', 'pC7'};
 
-% seperate data into behavioural impaired IFOF electrodes and all IFOF
-% electrodes
-cfg = []; 
-cfg.channel = behav_impairments;
+% separate data into behavioural impaired IFOF electrodes and all IFOF electrodes
+cfg             = [];
+cfg.channel     = behav_impairments;
 behav_impairments_data = ft_selectdata(cfg, data_epoched);
 
-cfg.channel = all_in_IFOF;
+cfg.channel     = all_in_IFOF;
 all_in_IFOF_data = ft_selectdata(cfg, data_epoched);
-

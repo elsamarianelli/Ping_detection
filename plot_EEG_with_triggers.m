@@ -21,8 +21,6 @@ trigger_array(trigSamples(trigSamples <= nSamples)) = max(channel_check);
 % Create figure
 figure;
 
-
-
 % Plot EEG signal on top (blue line)
 plot(1:nSamples, channel_check, 'b'); hold on;
 
@@ -32,7 +30,7 @@ plot(1:nSamples, trigger_array, 'r', 'LineWidth', 1)
 xlabel('Sample idx', 'FontSize', 18)
 ylabel('EEG amplitude', 'FontSize', 18)
 title('EEG with overlaid triggers from audio', 'FontSize', 20)
-legend({'Extracted triggers', 'EEG channel'}, 'FontSize', 16, 'Location','best')
+legend({'EEG channel','Extracted triggers'}, 'FontSize', 16, 'Location','best')
 set(gca, 'FontSize', 16)
 
 hold off;
