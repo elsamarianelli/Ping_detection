@@ -6,7 +6,6 @@ addpath 'C:/Users/Elsa Marianelli/Documents/GitHub/DAVIDE_data_and_docs/';      
 restoredefaultpath
 addpath 'C:\Users\Elsa Marianelli\Documents\GitHub\fieldtrip';
 
-
 % set audio data pair (list in word doc)
 EEG_code   = 'EEG_75';
 data_file  = [EEG_code '.TRC'];
@@ -45,7 +44,7 @@ ex_channel_trace = data_FT.trial{1}(3,:);               % example trace to use -
                                                         % in this set but check for different EEG files
 
 % Get start and stop times for stimulation periods (with plot to check if threshold is ok) 
-threshold                    = 500;                     % threshold for what constitutes a stimulation period
+threshold                    = 500;   % check plot and change appropriately                     % threshold for what constitutes a stimulation period
 merge_gap_sec                = 2;
 [stimTimes, artifact_matrix] = extract_stim_clusters(ex_channel_trace, data_FT.time{1}, data_FT.fsample, threshold, merge_gap_sec);
 
