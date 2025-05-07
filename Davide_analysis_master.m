@@ -6,21 +6,21 @@ addpath 'C:/Users/Elsa Marianelli/Documents/GitHub/DAVIDE_data_and_docs/';      
 restoredefaultpath
 addpath 'C:\Users\Elsa Marianelli\Documents\GitHub\fieldtrip';
 
+
 % set audio data pair (list in word doc)
 EEG_code   = 'EEG_75';
 data_file  = [EEG_code '.TRC'];
-audio      = 'audio_vid_76.wav';
+audio      = {'audio_vid_76.wav' 'audio_vid_77.wav'}; % can have more than 2 if there are multiple videos for an EEG code
+delay_time = [143/1000 2480533/1000] ; % delay of video start time compared to EEG (in s) - from word doc
 
-% configure
+% configure for preprocessing
 cfg             = [];
 cfg.dataset     = data_file;
 cfg.channel     = 'all';
-data_FT        = ft_preprocessing(cfg);
+data_FT         = ft_preprocessing(cfg); % load data into field trip structure
 
 % anonymise patient info!!
-data_FT.hdr.orig.name        = 'anon';
-data_FT.hdr.orig.surname     = 'anon';
-data_FT.hdr.subjectname      = 'anon';
+data_FT.hdr.orig.name = 'anon'; data_FT.hdr.orig.surname = 'anon'; data_FT.hdr.subjectname = 'anon';
 
 % checking different channels - MRK1+ has 1s time steps for a full cycle as reference
 cfg.channel     = 'MKR1+';
@@ -28,8 +28,15 @@ ft_databrowser(cfg, data_FT);
 
 %% [2] extract trigger times and stimulation times to save
 
-% i) Trigger times (pings)
-trigTimes       = extract_trigger_times(audio);          % save trigger times as excel file
+% i) Get trigger times from audio (ping sounds) and add in appropriate
+% delay) - if more than one video per EEG allows chaining of trigger times
+trigTimes = [];
+for i = 1:length(audio)
+    trigs           = extract_trigger_times(audio{i});         % save trigger times as excel file (seconds)
+    trigs           = trigs + delay_time(i);                   % add delay time to triger times to line up with EEG  
+    trigTimes       = [trigTimes, trigs];                      % add onto full trig time 
+end
+
 % trigTable     = readtable('audio_vid_72-triggerTimes.csv'); % alternatively extract presaved trig times
 % trigTimes    = trigTable.TriggerTimes;
 
@@ -38,7 +45,7 @@ ex_channel_trace = data_FT.trial{1}(3,:);               % example trace to use -
                                                         % in this set but check for different EEG files
 
 % Get start and stop times for stimulation periods (with plot to check if threshold is ok) 
-threshold                    = 200;                     % threshold for what constitutes a stimulation period
+threshold                    = 500;                     % threshold for what constitutes a stimulation period
 merge_gap_sec                = 2;
 [stimTimes, artifact_matrix] = extract_stim_clusters(ex_channel_trace, data_FT.time{1}, data_FT.fsample, threshold, merge_gap_sec);
 
@@ -49,19 +56,19 @@ save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
 
 % get cfg trial format
 time_before_ping = 0.5;                                % for trial lengths
-time_after_ping  = 0.5;
-cfg              = make_trial_cfg(trigTimes, data_FT, time_before_ping, time_after_ping);
+time_after_ping  = 1;
+[cfg, trigSamples] = make_epoching_trial_cfg(trigTimes, data_FT, time_before_ping, time_after_ping);
 
 % check that the trig times align with the data from a random channel...
-plot_EEG_with_triggers(data_FT, trigSamples)
-data_epoched    = ft_preprocessing(cfg);
+plot_EEG_with_triggers(data_FT, trigSamples) 
+data_epoched    = ft_preprocessing(cfg);             % Epoch data accordng to trials 
 
 % check
 cfg             = [];
 cfg.viewmode    = 'vertical';                         % classic EEG trace view
 cfg.channel     = 'all';                              % or a subset like {'Am3', 'Am4'}
 cfg.trials      = 1;                                  % show all trials (default)
-ft_databrowser(cfg, data_epoched);
+ft_databrowser(cfg, data_epoched);                    
 
 %% [4] Separate data based on contacts with behavioural impairment vs all contacts in IFOF
 
@@ -86,3 +93,5 @@ behav_impairments_data = ft_selectdata(cfg, data_epoched);
 
 cfg.channel     = all_in_IFOF;
 all_in_IFOF_data = ft_selectdata(cfg, data_epoched);
+
+%% 

@@ -1,4 +1,4 @@
-function cfg = make_epoching_trial_cfg(trigTimes, data_FT, secs_before, secs_after)
+function [cfg, trigSamples] = make_epoching_trial_cfg(trigTimes, data_FT, secs_before, secs_after)
     % make_trial_cfg: creates cfg.trl for FieldTrip epoching
     % 
     % Inputs:

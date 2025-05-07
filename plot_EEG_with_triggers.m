@@ -2,8 +2,8 @@ function plot_EEG_with_triggers(data_FT, trigSamples)
 % PLOT_EEG_WITH_TRIGGERS plots an EEG channel with overlaid trigger markers
 %
 % Inputs:
-%   data_FT     → FieldTrip EEG data structure
-%   trigSamples → vector of sample indices (same sampling as data_FT)
+%   data_FT     - FieldTrip EEG data structure
+%   trigSamples - vector of sample indices (same sampling as data_FT)
 %
 % Example:
 %   plot_EEG_with_triggers(data_FT, trigSamples)
@@ -21,11 +21,12 @@ trigger_array(trigSamples(trigSamples <= nSamples)) = max(channel_check);
 % Create figure
 figure;
 
-% Plot EEG signal on top (blue line)
-plot(1:nSamples, channel_check, 'b'); hold on;
-
 % Plot triggers first (thin red line, underneath EEG)
 plot(1:nSamples, trigger_array, 'r', 'LineWidth', 1)
+hold on;
+% Plot EEG signal on top (blue line)
+plot(1:nSamples, channel_check, 'b'); 
+
 % Label axes and set title etc.
 xlabel('Sample idx', 'FontSize', 18)
 ylabel('EEG amplitude', 'FontSize', 18)
