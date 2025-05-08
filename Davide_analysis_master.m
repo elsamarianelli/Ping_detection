@@ -1,16 +1,16 @@
 %% [1] load data and put into field trip to visualise 
 % get paths 
-path = 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/';                  % work comp
+addpath 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/';                  % work comp
 addpath 'C:/Users/Elsa Marianelli/Documents/GitHub/DAVIDE_data_and_docs/';           % work comp
-% path = '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs';      % laptop 
-restoredefaultpath
+addpath '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs';      % laptop 
+addpath /Users/elsamarianelli/Documents/GitHub/fieldtrip
 addpath 'C:\Users\Elsa Marianelli\Documents\GitHub\fieldtrip';
 
 % set audio data pair (list in word doc)
-EEG_code   = 'EEG_75';
+EEG_code   = 'EEG_71';
 data_file  = [EEG_code '.TRC'];
-audio      = {'audio_vid_76.wav' 'audio_vid_77.wav'}; % can have more than 2 if there are multiple videos for an EEG code
-delay_time = [143/1000 2480533/1000] ; % delay of video start time compared to EEG (in s) - from word doc
+audio      = {'audio_vid_72.wav'};% 'audio_vid_77.wav'}; % can have more than 2 if there are multiple videos for an EEG code
+delay_time = [142/1000];% 2480533/1000] ; % delay of video start time compared to EEG (in s) - from word doc
 
 % configure for preprocessing
 cfg             = [];
@@ -36,8 +36,8 @@ for i = 1:length(audio)
     trigTimes       = [trigTimes, trigs];                      % add onto full trig time 
 end
 
-% trigTable     = readtable('audio_vid_72-triggerTimes.csv'); % alternatively extract presaved trig times
-% trigTimes    = trigTable.TriggerTimes;
+trigTable     = readtable('audio_vid_72-triggerTimes.csv'); % alternatively extract presaved trig times
+trigTimes    = trigTable.TriggerTimes;
 
 % ii) stimulation times 
 ex_channel_trace = data_FT.trial{1}(3,:);               % example trace to use - it looks like they all have similar activity
@@ -69,6 +69,12 @@ cfg.channel     = 'all';                              % or a subset like {'Am3',
 cfg.trials      = 1;                                  % show all trials (default)
 ft_databrowser(cfg, data_epoched);                    
 
+%% [ongoing] trying to clean stimulaiton sections and recover underlying trace 
+threshold = 1000;
+pre_points = 3;
+post_points = 4;
+
+cleaned_trace = clean_stimulation_periods(trace, threshold, pre_points, post_points);
 %% [4] Separate data based on contacts with behavioural impairment vs all contacts in IFOF
 
 % contacts with behavioural impairments in IFOF
