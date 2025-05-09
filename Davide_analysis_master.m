@@ -31,7 +31,6 @@ ft_databrowser(cfg, data_FT);
 % get sampling frequency (Fs) for later
 Fs = data_FT.fsample;  
 
-
 %% [2] Extract trigger times and stimulation times to save
 
 % i) Get trigger times from audio (ping sounds) and add in appropriate delay
@@ -42,6 +41,8 @@ for i = 1:length(audio)
     trigs     = trigs + delay_time(i);                       % add delay time to trigger times to line up with EEG  
     trigTimes = [trigTimes, trigs];                           % add onto full trig time
 end
+
+% alternatively - load pre saved file (might not have delay)
 % trigTable     = readtable('audio_vid_72-triggerTimes.csv'); % alternatively extract presaved trig times
 % trigTimes    = trigTable.TriggerTimes;
 
@@ -55,7 +56,7 @@ merge_gap_sec                = 2;                             % threshold for wh
 [stimTimes, artifact_matrix] = extract_stim_clusters(ex_channel_trace, data_FT.time{1}, Fs, threshold, merge_gap_sec);
 
 % option to save as excel file for later use...
-save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
+% save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
 
 %% Epoching with 2 trial types 
 %  1) during task period - no stimulation
@@ -106,6 +107,21 @@ data_stim = ft_selectdata(cfg, data_epoched);
 % No stim trials
 cfg.trials = find(data_epoched.trialinfo == 2);
 data_no_stim = ft_selectdata(cfg, data_epoched);
+%% [ongoing] frequency analyis  - currently with settings from FT example
+
+cfg              = [];
+cfg.output       = 'pow';
+cfg.channel      = 'all';
+cfg.method       = 'mtmconvol';
+cfg.taper        = 'hanning';
+cfg.foi          = 2:1:60;                         % analysis 2 to 30 Hz in steps of 2 Hz
+cfg.t_ftimwin    = ones(length(cfg.foi),1).*0.5;   % length of time window = 0.5 sec
+cfg.toi          = -1:0.05:1;
+
+freq_anal = ft_freqanalysis(cfg, data_FT);
+for i = 1:10
+    figure; imagesc(freq_anal.powspctrm(i));
+end
 
 %% [ongoing] Trying to clean stimulation sections and recover underlying trace 
 
@@ -114,8 +130,6 @@ pre_points   = 3;
 post_points  = 4;
 
 cleaned_trace = clean_stimulation_periods(trace, threshold, pre_points, post_points);
-
-
 %% [4] Separate data based on contacts with behavioural impairment vs all contacts in IFOF
 
 % contacts with behavioural impairments in IFOF
