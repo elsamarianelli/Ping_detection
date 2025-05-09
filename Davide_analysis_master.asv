@@ -25,6 +25,8 @@ data_FT.hdr.orig.name = 'anon'; data_FT.hdr.orig.surname = 'anon'; data_FT.hdr.s
 cfg.channel     = 'MKR1+';
 ft_databrowser(cfg, data_FT);
 
+% get sampling frequency (Fs) for later 
+Fs = data_FT.fsample;  
 %% [2] extract trigger times and stimulation times to save
 
 % i) Get trigger times from audio (ping sounds) and add in appropriate
@@ -35,9 +37,10 @@ for i = 1:length(audio)
     trigs           = trigs + delay_time(i);                   % add delay time to triger times to line up with EEG  
     trigTimes       = [trigTimes, trigs];                      % add onto full trig time 
 end
-
-trigTable     = readtable('audio_vid_72-triggerTimes.csv'); % alternatively extract presaved trig times
-trigTimes    = trigTable.TriggerTimes;
+% 
+% trigTable     = readtable('audio_vid_72-triggerTimes.csv'); % alternatively extract presaved trig times
+% trigTimes    = trigTable.TriggerTimes;
+% 
 
 % ii) stimulation times 
 ex_channel_trace = data_FT.trial{1}(3,:);               % example trace to use - it looks like they all have similar activity
@@ -46,7 +49,7 @@ ex_channel_trace = data_FT.trial{1}(3,:);               % example trace to use -
 % Get start and stop times for stimulation periods (with plot to check if threshold is ok) 
 threshold                    = 500;   % check plot and change appropriately                     % threshold for what constitutes a stimulation period
 merge_gap_sec                = 2;
-[stimTimes, artifact_matrix] = extract_stim_clusters(ex_channel_trace, data_FT.time{1}, data_FT.fsample, threshold, merge_gap_sec);
+[stimTimes, artifact_matrix] = extract_stim_clusters(ex_channel_trace, data_FT.time{1}, Fs, threshold, merge_gap_sec);
 
 % option to save as excel file for later use...
 save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
@@ -56,10 +59,11 @@ save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
 % get cfg trial format
 time_before_ping = 0.5;                                % for trial lengths
 time_after_ping  = 1;
-[cfg, trigSamples] = make_epoching_trial_cfg(trigTimes, data_FT, time_before_ping, time_after_ping);
+[array, trigSamples] = make_epoching_trial_cfg(trigTimes, data_FT, time_before_ping, time_after_ping);
 
 % check that the trig times align with the data from a random channel...
-plot_EEG_with_triggers(data_FT, trigSamples) 
+trigSamples     = plot_EEG_with_triggers(data_FT, trigSamples); % also returns trigSample not out of boudns
+
 data_epoched    = ft_preprocessing(cfg);             % Epoch data accordng to trials 
 
 % check
@@ -69,20 +73,59 @@ cfg.channel     = 'all';                              % or a subset like {'Am3',
 cfg.trials      = 1;                                  % show all trials (default)
 ft_databrowser(cfg, data_epoched);                    
 
-%% trying to clean stimulaiton sections and recover underlying trace 
-trace = data_FT.trial{1}(1, :);
+%% Epoching with 2 trial types 
+%  1) during task period - no stimulation
+%  2) during task period - overlap with stimualiton 
+
+% first get all possible indexes where there is a stimulation period
+stimSamples            = arrayfun(@(s,e) round(s*Fs):round(e*Fs), ...
+                        stimTimes(:,1), stimTimes(:,2), 'UniformOutput', false);
+allStimIdxs            = [stimSamples{:}]; % flatten into a vector
+
+% then compare these to the trig times, to get trig times in and out of
+% stim periods
+trigTimes_idx = round(trigTimes*Fs);
+trigs_during_stim = trigTimes_idx(ismember(trigTimes_idx, allStimIdxs));      
+trigs_not_during_stim = trigTimes_idx(~ismember(trigTimes_idx, allStimIdxs));     
+
+% plot to visualise and remove out of bounds - ASK DAVIDE ABOUT WHY THIS I
+out_of_bounds  = plot_EEG_with_triggers(data_FT, trigs_not_during_stim); % also returns trigSample not out of boudns
+trigs_not_during_stim = trigs_not_during_stim(~ismember(trigs_not_during_stim, out_of_bounds)); % REMOVE out of bounds triggers
+
+% get in cfg.trl formats
+% get cfg trial format (divide by Fs because func does this for you)
+time_before_ping      = 0.5;                                
+time_after_ping       = 1;
+[formated_stim, ~]    = make_epoching_trial_cfg(trigs_during_stim/Fs, data_FT, time_before_ping, time_after_ping);
+[formated_no_stim, ~] = make_epoching_trial_cfg(trigs_not_during_stim/Fs, data_FT, time_before_ping, time_after_ping);
+
+% add trial label for field trip 1 = during stim, 2 = not during stim
+formated_stim         = [formated_stim, ones(size(formated_stim,1), 1)];  % label = 1
+formated_no_stim      = [formated_no_stim, 2 * ones(size(formated_no_stim,1), 1)];  % label = 2
+
+% Combine
+cfg                   = [];
+cfg.dataset           = data_file;
+cfg.trl               = [formated_stim; formated_no_stim];
+
+% Process data
+data_FT.cfg = cfg;
+data_epoched = ft_preprocessing(cfg);
+
+% Select only "stim" trials
+cfg.trials = find(data_epoched.trialinfo == 1);
+data_stim = ft_selectdata(cfg);
+
+% Select only "no stim" trials
+cfg.trials = find(data_epoched.trialinfo == 2);
+data_no_stim = ft_selectdata(cfg);
+
+%% [ongoing] trying to clean stimulaiton sections and recover underlying trace 
 threshold = 1000;
-% Step 1: Find where the trace exceeds threshold
-artifact_mask = abs(trace) > threshold;
+pre_points = 3;
+post_points = 4;
 
-% Step 2: Set those points to NaN
-clean_trace = trace;
-clean_trace(artifact_mask) = NaN;
-
-% Step 3: Interpolate over NaNs (linear interpolation)
-nan_idx = isnan(clean_trace);
-clean_trace(nan_idx) = interp1(find(~nan_idx), clean_trace(~nan_idx), find(nan_idx), 'linear', 'extrap');
-
+cleaned_trace = clean_stimulation_periods(trace, threshold, pre_points, post_points);
 %% [4] Separate data based on contacts with behavioural impairment vs all contacts in IFOF
 
 % contacts with behavioural impairments in IFOF
@@ -106,5 +149,3 @@ behav_impairments_data = ft_selectdata(cfg, data_epoched);
 
 cfg.channel     = all_in_IFOF;
 all_in_IFOF_data = ft_selectdata(cfg, data_epoched);
-
-%% 

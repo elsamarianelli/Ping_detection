@@ -1,14 +1,16 @@
-function [cfg, trigSamples] = make_epoching_trial_cfg(trigTimes, data_FT, secs_before, secs_after)
-    % make_trial_cfg: creates cfg.trl for FieldTrip epoching
-    % 
-    % Inputs:
-    % - trigTimes: vector of trigger times (in seconds)
-    % - data_FT: FieldTrip data structure (needs .fsample)
-    % - secs_before: seconds before trigger to include
-    % - secs_after: seconds after trigger to include
-    %
-    % Output:
-    % - cfg: struct with .trl field ready for ft_preprocessing
+function [array, trigSamples] = make_epoching_trial_cfg(trigTimes, data_FT, secs_before, secs_after)
+% creates cfg.trl array for FieldTrip epoching, contains begining, end, 
+% and offset for that trial
+
+% Inputs
+% - trigTimes: vector of trigger times (in seconds)
+% - data_FT: FieldTrip data structure (needs .fsample)
+% - secs_before: seconds before trigger to include
+% - secs_after: seconds after trigger to include
+%
+% Output
+% - array to go into cfg.trl
+    
 
     % Convert to samples
     trigSamples = round(trigTimes * data_FT.fsample);
@@ -20,8 +22,6 @@ function [cfg, trigSamples] = make_epoching_trial_cfg(trigTimes, data_FT, secs_b
     endsample = trigSamples + posttrig - 1;
     offset = -pretrig * ones(size(trigSamples));
 
-    % Build cfg
-    cfg = [];
-    cfg.trl = [begsample, endsample, offset];
-    cfg.channel = [];  % include all channels (or set to subset later)
+    % For cfg.trl
+    array = [begsample, endsample, offset];
 end
