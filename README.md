@@ -20,7 +20,7 @@ Run this to:
 
 | Function                        | Description                                                          |
 |--------------------------------|----------------------------------------------------------------------|
-| `extract_trigger_times`        | Detects auditory ping times from an audio file                      |
+| `extract_trigger_times`        | Detects   ping times from an audio file                             |
 | `extract_stim_clusters`        | Identifies sustained high-amplitude EEG stimulation periods         |
 | `clean_stimulation_periods`    | Removes and interpolates stimulation artifacts in a single EEG trace |
 | `make_epoching_trial_cfg`      | Builds FieldTrip-style trial definitions from ping times            |
