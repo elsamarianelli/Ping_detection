@@ -1,8 +1,30 @@
 function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs, threshold, merge_gap_sec)
-    % trace           - raw EEG signal
-    % timeVec         - time axis (same length as trace)
-    % threshold       - amplitude threshold to detect stimulation periods
-    % merge_gap_sec    gap (in seconds) below which clusters are merged
+%% Function to extract trigger times from audio recordings (ping detection)
+%  Elsa Marianelli, UCL (2025) zcbtetm@ucl.ac.uk - Edited by Dan Bush 
+%
+%  This function extracts the timestamps of ping-like audio triggers from a 
+%  provided audio file. It uses a template matching method based on the 
+%  spectrogram of a known trigger sound to identify peaks in the full audio.
+%
+%  Inputs:
+%  dataFile  - string, filename of the audio file (e.g., 'audio_vid_76.wav')
+%
+%  Outputs:
+%  trigs     - vector of trigger times (in seconds) corresponding to detected
+%              pings within the audio
+%
+%  Interactive steps:
+%  - Step 1: Set a power threshold interactively to detect pings.
+%  - Step 2: (Optional) Set a start time threshold to remove pre-task periods.
+%
+%  Additional behavior:
+%  - Option to save the detected trigger times as a CSV file (interactive prompt)
+%
+%  Notes:
+%  - Make sure the template ping audio ('actual_ping_shorter.wav') is available 
+%    in the same data directory.
+%  - The data directory (dataFold) is hard-coded and may need to be updated
+%    depending on the computer being used.
 
 
     % Binary mask: above threshold

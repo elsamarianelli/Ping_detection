@@ -1,14 +1,23 @@
 function cleaned_trace = clean_stimulation_periods(trace, threshold, pre_points, post_points)
-% remove spikes caused by manual stimuluation - and interpolate
-% between the resulting gaps to try and recovery the underlying trace for
-% each channel - plots to visualise resultant trace
+%% Function to remove stimulation artifacts from EEG trace
+%  Elsa Marianelli, UCL (2025) zcbtetm@ucl.ac.uk
+%
+%  Removes large transient artifacts caused by manual 
+%  stimulation in EEG recordings. Detected spikes are masked and then 
+%  interpolated to recover the underlying signal as smoothly as possible.
+%  Plots for visualisation. Intended for preprocessing EEG prior to epoching 
+%  or feature extraction.
+%
+%  Inputs:
+%  trace        - 1D vector, raw EEG signal from a single channel
+%  threshold    - scalar, amplitude threshold to detect stimulation peaks
+%  pre_points   - number of points before each peak to mask
+%  post_points  - number of points after each peak to mask
+%
+%  Outputs:
+%  cleaned_trace - 1D vector, EEG trace with stimulation periods removed
+%                  and interpolated
 
-    % Inputs:
-    % trace: your EEG data vector (for a single channel)
-    % threshold: threshold to detect crossings
-    % pre_points: number of points BEFORE the peak to mask
-    % post_points: number of points AFTER the peak to mask
-    
     % [1] Find threshold crossings (rising edge)
     crossings = find(diff(trace > threshold) == 1);
     

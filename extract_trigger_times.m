@@ -1,6 +1,27 @@
-%% Code to extract audio triggers from video data for Davide
-%  Written by Elsa Marianelli, edited by Daniel Bush (2025)
 function [trigs] = extract_trigger_times(dataFile)
+%% Function to extract audio-based trigger times from video recordings
+%  Elsa Marianelli, UCL (2025) zcbtetm@ucl.ac.uk
+%  Edited by Daniel Bush 
+%
+%  This function compares spectrograms comparison to detect instances of a known 
+%  audio trigger (e.g., a "ping") within an audio file
+%  Users interactively define Y and X thresholds to detect valid trigger peaks
+%  and exclude irrelevant soun ds (e.g., speech). The final trigger times (in seconds) 
+%  are returned and optionally saved to a .csv file.
+%
+%  Inputs:
+%  dataFile     - filename (string) of the audio track to scan (e.g., 'audio_vid_76.wav')
+%
+%  Outputs:
+%  trigs        - vector of trigger times in seconds (rounded to milliseconds)
+%
+%  Notes:
+%  - Requires: trigger template audio file (default: 'actual_ping_shorter.wav')
+%  - The trigger extraction is semi-automated, with user-defined thresholds
+%  - Trigger times are returned in seconds and optionally saved to CSV
+%  - Audio preview and visualization plots included for threshold setting
+
+
 %% Set some parameters
 % dataFold        = 'D:\Data\Davide Project\';                % Data path 
 % dataFold        = '/Users/elsamarianelli/Documents/audio_pip_task'; % on laptop
