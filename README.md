@@ -9,7 +9,7 @@ The main script is:
 
 Run this to:
 - Load EEG and audio data
-- Extract auditory ping trigger times from `.wav` files
+- Extract ping trigger times from `.wav` files
 - Detect stimulation periods in EEG traces
 - Epoch the EEG into trials (stim vs non-stim)
 - Optionally clean artifacts from stimulation periods
