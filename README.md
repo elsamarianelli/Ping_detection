@@ -1,5 +1,11 @@
 # IFOF iEEG and accompanying video processing
-The goal is to align audio-derived trigger times with iEEG, clean stimulation periods, and segment the EEG data into trials for further analysis (e.g. FT)
+Code to align trigger times extracted from audio files with iEEG traces, clean stimulation periods, and segment the EEG data into trials for further analysis (e.g. FT)
+
+## Notes 
+Still need too: 
+- look at interictal spikes
+- apply stim cleaning across all channels?
+- FT on epoched by trials
 
 ## Getting Started
 
@@ -23,7 +29,7 @@ Run this to:
 | `extract_trigger_times`        | Detects   ping times from an audio file                             |
 | `extract_stim_clusters`        | Identifies sustained high-amplitude EEG stimulation periods         |
 | `clean_stimulation_periods`    | Removes and interpolates stimulation artifacts in a single EEG trace |
-| `make_epoching_trial_cfg`      | Builds FieldTrip-style trial definitions from ping times            |
+| `make_epoching_trial_cfg`      | Builds FieldTrip-style trial configs    from ping times            |
 | `epoch_with_stim_and_trig_times` | Automatically creates stim vs non-stim trial groups               |
 | `plot_EEG_with_triggers`       | Overlays ping times on EEG trace for inspection                     |
 | `save_trig_and_stim_times`     | Saves ping/stim times into an Excel sheet                           |
