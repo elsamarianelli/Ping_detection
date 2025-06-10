@@ -39,14 +39,14 @@ ft_databrowser(cfg, data_FT);
 
 Fs = data_FT.fsample;  % Sampling frequency
 
-%% [3] Load Stim Tables and Extract Stimulation Times 
+%% [3] Load Stim Tables and Extract Stimulation Times
 % ---------------------------------------------------
 
 file_path = 'Davide_Project/DAVIDE_data_and_docs/';
 stim_file = 'bard_2-20230301_114215-20240820_110340_WM_stim';
 stim_times_file = readtable(stim_file);
 
-% Read ping stim labels (during stim or not) - not sure this is helpful
+% Read ping stim labels (during stim or not)
 ping_stims = readtable('AM3_AM4');
 Stimulated = ping_stims.Stimulated;
 
@@ -56,43 +56,30 @@ stim_table = extract_stim_times_from_table(stim_times_file, '11:41:49');
 %% [4] Trigger Detection from Audio Files
 % ---------------------------------------
 
-% Get with interactive plot
 trigTimes = [];
 for i = 1:length(audio)
     trigs = extract_trigger_times(audio{i});
     trigTimes = [trigTimes, trigs + delay_time(i)];
 end
 
-% OR get presaved ones
-% trigTimes = [];
-% for i = 1:length(audio)
-%    file_name = [erase(audio{i}, '.wav') '-triggerTimes.csv'];
-%    trigTable    = readtable(filename); 
-%    trigTimes    = trigTable.TriggerTimes;
-%    trigTimes = [trigTimes, trigs + delay_time(i)];
-% end
-
 %% [5] Extract Stimulation Windows from EEG Trace
 % -----------------------------------------------
 
-trace_idx = 3;  % 3 = Am3, 4 = Am4 (see data_FT.label for more)
-merge_gap_sec = 2; % gap (in seconds) below which clusters are merged
+trace_idx = 4;  % e.g. Am4
+threshold = 400;
+merge_gap_sec = 2;
 
 ex_trace = data_FT.trial{1}(trace_idx, :);
 timeVec  = data_FT.time{1};
 
 [stimTimes, artifact_matrix] = extract_stim_clusters(ex_trace, timeVec, Fs, threshold, merge_gap_sec);
-
-% option to save
-% save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
+save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
 
 %% [6] Align Extracted Stim Windows with Log Times (for visual validation)
 % ------------------------------------------------------------------------
 
-% Estimate delay between extracted and logged stim - need to set alignment
-% indices manually (here the 6th extracted stimulation time aligns with the
-% 2nd one from the excel file)
-first = stimTimes(8, 1);
+% Estimate delay between extracted and logged stim
+first = stimTimes(6, 1);
 match_with = stim_table.Start(2);
 delay_offset = first - match_with;
 
@@ -106,9 +93,37 @@ plot_trace_with_stim_sources(ex_trace, timeVec, stimTimes, stim_table_new)
 
 %% [7] Match Pings to Stim Windows
 % --------------------------------
-matchFlags = matchPingstoStimWindows(trigTimes, stim_table_new);
 
-%% [8] Epoch Data into triggers which occured Stim and No-Stim Trials
+matchFlags = zeros(length(trigTimes), 1);
+stimTimes_new = stim_table_new{:, 1:2};
+
+for i = 1:length(trigTimes)
+    for j = 1:size(stimTimes_new, 1)
+        if trigTimes(i) >= stimTimes_new(j,1) && trigTimes(i) <= stimTimes_new(j,2)
+            matchFlags(i) = 1;
+            break;
+        end
+    end
+end
+
+% Plot matches vs mismatches
+figure;
+hold on;
+
+% Patches for stim windows
+for i = 1:size(stimTimes_new,1)
+    patch([stimTimes_new(i,1), stimTimes_new(i,2), stimTimes_new(i,2), stimTimes_new(i,1)], ...
+          [-1, -1, 1, 1], [1 0.8 0.8], 'EdgeColor', 'none', 'FaceAlpha', 1);
+end
+
+% Plot pings
+stem(trigTimes(matchFlags==0), -1*ones(sum(matchFlags==0),1), 'b', 'filled');
+stem(trigTimes(matchFlags==1), -1*ones(sum(matchFlags==1),1), 'r', 'filled');
+title('Ping Times vs. Stimulation Matches');
+xlabel('Time (s)'); ylabel('Match');
+legend('Stim Window', 'No Match', 'Match');
+
+%% [8] Epoch Data into Stim and No-Stim Trials
 % --------------------------------------------
 
 % Get stim indices in samples
@@ -158,8 +173,6 @@ cfg.trials = find(data_epoched.trialinfo == 2);
 data_no_stim = ft_selectdata(cfg, data_epoched);
 
 %% [9] Clean Stim Artifacts from Epoched Trials
-% this should only really apply to the stimulus trials - as the non
-% stimulus period trials should have any high frequency activity
 % ---------------------------------------------
 
 threshold    = 1000;
@@ -177,8 +190,7 @@ for trialIdx = 1:length(data_epoched.trial)
     end
 end
 
-
-%% [extra] Separate by Anatomical Contact Groups
+%% [10] Separate by Anatomical Contact Groups
 % -------------------------------------------
 
 behav_impairments = {'Am3', 'Am4', 'aIn4', 'aIn5', 'IFG4', 'IFG5', 'IFG6', 'IFG7'};

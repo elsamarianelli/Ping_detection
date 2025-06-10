@@ -1,16 +1,45 @@
------------------------------------------- Davide_analysis_master.m ------------------------------------------
+# IFOF iEEG and accompanying video processing
+Code to align trigger times extracted from audio files with iEEG traces, clean stimulation periods, and segment the EEG data into trials for further analysis (e.g. FT)
 
-1) trigger time detection (with pprompts to appropriately set threhsholding), saves trigger times in excel file (optional)
-2) loads EEG data- preprocesses, and runs field trip analysis - given lack of a trigger channel, cfg.trl matrix is made using trigger times extracted * sampling frequency 
+## Notes 
+Still need too: 
+- look at interictal spikes
+- apply stim cleaning across all channels?
+- FT on epoched by trials
 
------------------------------------------- extract_trigger_times.m ------------------------------------------
+## Getting Started
 
-This script analyzes an audio recording to detect specific sound events (triggers) based on a template trigger file. It:
+The main script is:
 
-1) Loads the main audio file and the trigger template.
-2) Computes and normalizes spectrograms for both signals.
-3) Extracts dominant frequency bands from the trigger.
-4) Filters the full audio based on these dominant frequencies.
-5) Smooths the extracted power signal and allows manual threshold setting.
-6) Plots the extracted triggers and plays back the audio with a moving cursor for validation.
-7) Saves detected trigger times as a .csv file.
+### `Davide_analysis_master.m`
+
+Run this to:
+- Load EEG and audio data
+- Extract ping trigger times from `.wav` files
+- Detect stimulation periods in EEG traces
+- Epoch the EEG into trials (stim vs non-stim)
+- Optionally clean artifacts from stimulation periods
+
+---
+
+## Function Overview
+
+| Function                        | Description                                                          |
+|--------------------------------|----------------------------------------------------------------------|
+| `extract_trigger_times`        | Detects   ping times from an audio file                             |
+| `extract_stim_clusters`        | Identifies sustained high-amplitude EEG stimulation periods         |
+| `clean_stimulation_periods`    | Removes and interpolates stimulation artifacts in a single EEG trace |
+| `make_epoching_trial_cfg`      | Builds FieldTrip-style trial configs    from ping times            |
+| `epoch_with_stim_and_trig_times` | Automatically creates stim vs non-stim trial groups               |
+| `plot_EEG_with_triggers`       | Overlays ping times on EEG trace for inspection                     |
+| `save_trig_and_stim_times`     | Saves ping/stim times into an Excel sheet                           |
+| `playback_with_cursor_new`     | Plays audio with interactive cursor and speed controls              |
+
+---
+
+## Dependencies
+
+- [FieldTrip Toolbox](https://www.fieldtriptoolbox.org/)
+- Signal Processing Toolbox
+ 
+

@@ -1,43 +1,44 @@
 function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs, threshold, merge_gap_sec)
-    % trace           - raw EEG signal
-    % timeVec         - time axis (same length as trace)
-    % threshold       - amplitude threshold to detect stimulation periods
-    % merge_gap_sec    gap (in seconds) below which clusters are merged
-    
-    % Parameters
-    window_size = 5;
-    n = length(trace);
-    
-    % Preallocate variability array
-    trace_variability = nan(1, n);  % Set first few to NaN
-    
-    % Compute variability
-    for t = (window_size + 1):n
-        mean_prev = mean(trace(t - window_size:t - 1));
-        trace_variability(t) = abs(trace(t) - mean_prev);
-    end
-    % 
-    % % Plot
-    figure;
-    plot(1:n, trace, 'b-', 'DisplayName', 'Original Trace'); hold on;
-    plot(1:n, trace_variability, 'r-', 'DisplayName', 'Trace Variability');
-    xlabel('Time');
-    ylabel('Value');
-    legend;
-    title('Trace and Trace Variability');
+%% Function to extract trigger times from audio recordings (ping detection)
+%  Elsa Marianelli, UCL (2025) zcbtetm@ucl.ac.uk - Edited by Dan Bush 
+%
+%  This function extracts the timestamps of ping-like audio triggers from a 
+%  provided audio file. It uses a template matching method based on the 
+%  spectrogram of a known trigger sound to identify peaks in the full audio.
+%
+%  Inputs:
+%  dataFile  - string, filename of the audio file (e.g., 'audio_vid_76.wav')
+%
+%  Outputs:
+%  trigs     - vector of trigger times (in seconds) corresponding to detected
+%              pings within the audio
+%
+%  Interactive steps:
+%  - Step 1: Set a power threshold interactively to detect pings.
+%  - Step 2: (Optional) Set a start time threshold to remove pre-task periods.
+%
+%  Additional behavior:
+%  - Option to save the detected trigger times as a CSV file (interactive prompt)
+%
+%  Notes:
+%  - Make sure the template ping audio ('actual_ping_shorter.wav') is available 
+%    in the same data directory.
+%  - The data directory (dataFold) is hard-coded and may need to be updated
+%    depending on the computer being used.
+
 
     % Binary mask: above threshold
     threshold = 20;
     over_thresh = trace_variability > threshold;
-    over_thresh_outofbounds = trace > 2500; 
-
-    % merge binary masks 
-    over_thresh = (over_thresh + over_thresh_outofbounds) > 0; 
-    
     % Merge short gaps between clusters
     merge_gap_samples = round(merge_gap_sec * Fs);
     over_thresh = imclose(over_thresh, ones(1, merge_gap_samples));
-
+    
+    % add the ones that are too stimulated for frequency to show up
+    over_thresh_outofbounds = trace > 2500; 
+    % merge binary masks 
+    over_thresh = (over_thresh + over_thresh_outofbounds) > 0; 
+    % 
     % Find start and end indices from logical array
     diff_over = diff([0, over_thresh, 0]);
     start_idx = find(diff_over == 1);
