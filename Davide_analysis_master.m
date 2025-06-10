@@ -1,141 +1,197 @@
-%% [1] Load data and put into FieldTrip to visualise 
+%% ========================================================
+%  MASTER SCRIPT: EEG STIMULATION AND TRIAL ANALYSIS
+%  - Preprocessing, trigger alignment, trial epoching
+%  - Separation by stimulation type & contact grouping
+% =========================================================
 
-% get paths 
-addpath 'C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/';                   % work comp
-addpath 'C:/Users/Elsa Marianelli/Documents/GitHub/DAVIDE_data_and_docs/';            % work comp
-addpath '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs';        % laptop
-addpath /Users/elsamarianelli/Documents/GitHub/fieldtrip
-addpath 'C:\Users\Elsa Marianelli\Documents\GitHub\fieldtrip';
+%% [1] Setup and Initial Configuration
+% ------------------------------------
 
-% set audio data pair (list in word doc)
-EEG_code   = 'EEG_71';
+% Add data and toolbox paths (adjust for laptop/work machine)
+addpath('C:/Users/Elsa Marianelli/Documents/GitHub/Ping_detection/');
+addpath('C:/Users/Elsa Marianelli/Documents/GitHub/DAVIDE_data_and_docs/');
+addpath('/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs');
+addpath('/Users/elsamarianelli/Documents/GitHub/fieldtrip');
+addpath('C:/Users/Elsa Marianelli/Documents/GitHub/fieldtrip');
+
+% Audio-video mapping (can be more than one)
+EEG_code   = 'EEG_75';
 data_file  = [EEG_code '.TRC'];
-audio      = {'audio_vid_72.wav'};             % can have more than 2 if there are multiple videos for an EEG code
-delay_time = [142/1000];                       % delay of video start time compared to EEG (in s) - from word doc
+audio      = {'audio_vid_76.wav', 'audio_vid_77.wav'};
+delay_time = [143/1000, 2480533/1000];  % delay of video vs EEG (in sec)
 
-% configure for preprocessing
+%% [2] Load EEG Data and Preprocess via FieldTrip
+% -----------------------------------------------
+
 cfg             = [];
 cfg.dataset     = data_file;
 cfg.channel     = 'all';
-data_FT         = ft_preprocessing(cfg);       % load data into FieldTrip structure
+data_FT         = ft_preprocessing(cfg);  % Load EEG
 
-% anonymise patient info!!
+% Anonymize patient metadata
 data_FT.hdr.orig.name      = 'anon';
 data_FT.hdr.orig.surname   = 'anon';
 data_FT.hdr.subjectname    = 'anon';
 
-% checking different channels - MRK1+ has 1s time steps for a full cycle as reference
-cfg.channel     = 'MKR1+';
+% Launch browser for visual channel inspection
+cfg.channel = [];
 ft_databrowser(cfg, data_FT);
 
-% get sampling frequency (Fs) for later
-Fs = data_FT.fsample;  
+Fs = data_FT.fsample;  % Sampling frequency
 
+%% [3] Load Stim Tables and Extract Stimulation Times 
+% ---------------------------------------------------
 
-%% [2] Extract trigger times and stimulation times to save
+file_path = 'Davide_Project/DAVIDE_data_and_docs/';
+stim_file = 'bard_2-20230301_114215-20240820_110340_WM_stim';
+stim_times_file = readtable(stim_file);
 
-% i) Get trigger times from audio (ping sounds) and add in appropriate delay
-%    - if more than one video per EEG allows chaining of trigger times
+% Read ping stim labels (during stim or not) - not sure this is helpful
+ping_stims = readtable('AM3_AM4');
+Stimulated = ping_stims.Stimulated;
+
+% Convert stim table to usable format (offset-adjusted)
+stim_table = extract_stim_times_from_table(stim_times_file, '11:41:49');
+
+%% [4] Trigger Detection from Audio Files
+% ---------------------------------------
+
+% Get with interactive plot
 trigTimes = [];
 for i = 1:length(audio)
-    trigs     = extract_trigger_times(audio{i});             % save trigger times as excel file (seconds)
-    trigs     = trigs + delay_time(i);                       % add delay time to trigger times to line up with EEG  
-    trigTimes = [trigTimes, trigs];                           % add onto full trig time
+    trigs = extract_trigger_times(audio{i});
+    trigTimes = [trigTimes, trigs + delay_time(i)];
 end
-% trigTable     = readtable('audio_vid_72-triggerTimes.csv'); % alternatively extract presaved trig times
-% trigTimes    = trigTable.TriggerTimes;
 
-% ii) Stimulation times 
-ex_channel_trace = data_FT.trial{1}(3,:);                    % example trace to use - looks like they all have similar activity
-                                                             % in this set but check for different EEG files
+% OR get presaved ones
+% trigTimes = [];
+% for i = 1:length(audio)
+%    file_name = [erase(audio{i}, '.wav') '-triggerTimes.csv'];
+%    trigTable    = readtable(filename); 
+%    trigTimes    = trigTable.TriggerTimes;
+%    trigTimes = [trigTimes, trigs + delay_time(i)];
+% end
 
-% Get start and stop times for stimulation periods (with plot to check if threshold is ok) 
-threshold                    = 500;                           % check plot and change appropriately
-merge_gap_sec                = 2;                             % threshold for what constitutes a stimulation period
-[stimTimes, artifact_matrix] = extract_stim_clusters(ex_channel_trace, data_FT.time{1}, Fs, threshold, merge_gap_sec);
+%% [5] Extract Stimulation Windows from EEG Trace
+% -----------------------------------------------
 
-% option to save as excel file for later use...
-save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
+trace_idx = 3;  % 3 = Am3, 4 = Am4 (see data_FT.label for more)
+merge_gap_sec = 2; % gap (in seconds) below which clusters are merged
 
-%% Epoching with 2 trial types 
-%  1) during task period - no stimulation
-%  2) during task period - overlap with stimulation 
+ex_trace = data_FT.trial{1}(trace_idx, :);
+timeVec  = data_FT.time{1};
 
-% first get all possible indexes where there is a stimulation period
-stimSamples     = arrayfun(@(s,e) round(s*Fs):round(e*Fs), stimTimes(:,1), stimTimes(:,2), 'UniformOutput', false);
-allStimIdxs     = [stimSamples{:}];                           % flatten into a vector
+[stimTimes, artifact_matrix] = extract_stim_clusters(ex_trace, timeVec, Fs, threshold, merge_gap_sec);
 
-% then compare these to the trig times, to get trig times in and out of stim periods
-trigTimes_idx           = round(trigTimes * Fs);
-trigs_during_stim       = trigTimes_idx(ismember(trigTimes_idx, allStimIdxs))';      
-trigs_not_during_stim   = trigTimes_idx(~ismember(trigTimes_idx, allStimIdxs))';     
+% option to save
+% save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
 
-% plot to visualise and remove out of bounds - ASK DAVIDE ABOUT WHY THIS EXISTS??
-out_of_bounds           = plot_EEG_with_triggers(data_FT, trigs_not_during_stim);    % also returns trigSample not out of bounds
-trigs_not_during_stim   = trigs_not_during_stim(~ismember(trigs_not_during_stim, out_of_bounds)); % REMOVE out of bounds triggers
+%% [6] Align Extracted Stim Windows with Log Times (for visual validation)
+% ------------------------------------------------------------------------
 
-% get in cfg.trl formats
-% get cfg trial format (divide by Fs because func does this for you)
-time_before_ping        = 0.5;                                
-time_after_ping         = 1;
-[formated_stim, ~]      = make_epoching_trial_cfg(trigs_during_stim / Fs, data_FT, time_before_ping, time_after_ping);
-[formated_no_stim, ~]   = make_epoching_trial_cfg(trigs_not_during_stim / Fs, data_FT, time_before_ping, time_after_ping);
+% Estimate delay between extracted and logged stim - need to set alignment
+% indices manually (here the 6th extracted stimulation time aligns with the
+% 2nd one from the excel file)
+first = stimTimes(8, 1);
+match_with = stim_table.Start(2);
+delay_offset = first - match_with;
 
-% add trial label for field trip 1 = during stim, 2 = not during stim
-formated_stim           = [formated_stim, ones(size(formated_stim,1), 1)];            % label = 1
-formated_no_stim        = [formated_no_stim, 2 * ones(size(formated_no_stim,1), 1)];   % label = 2
+% Adjust table stim times
+stim_table_new = stim_table;
+stim_table_new.Start = stim_table.Start + delay_offset;
+stim_table_new.End = stim_table.End + delay_offset;
 
-% Combine
-cfg                     = [];
-cfg.dataset             = data_file;
-cfg.trl                 = [formated_stim; formated_no_stim];
+% Visual alignment
+plot_trace_with_stim_sources(ex_trace, timeVec, stimTimes, stim_table_new)
 
-% final check to remove any trials out of bounds (might be a problem if the full trial window goes out of bounds even if the trigger time wasn't)
-nSamples                = size(data_FT.trial{1}, 2);
-cfg.trl                 = cfg.trl(cfg.trl(:,1) >= 1 & cfg.trl(:,2) <= nSamples, :); 
+%% [7] Match Pings to Stim Windows
+% --------------------------------
+matchFlags = matchPingstoStimWindows(trigTimes, stim_table_new);
 
-% Process data
-data_FT.cfg             = cfg;
-data_epoched            = ft_preprocessing(cfg);
+%% [8] Epoch Data into triggers which occured Stim and No-Stim Trials
+% --------------------------------------------
 
-% Stim trials
+% Get stim indices in samples
+stimSamples = arrayfun(@(s,e) round(s*Fs):round(e*Fs), ...
+    stimTimes(:,1), stimTimes(:,2), 'UniformOutput', false);
+allStimIdxs = [stimSamples{:}];
+
+trigSamples_idx = round(trigTimes * Fs);
+in_stim         = ismember(trigSamples_idx, allStimIdxs);
+
+trigs_during_stim     = trigSamples_idx(in_stim)';
+trigs_not_during_stim = trigSamples_idx(~in_stim)';
+
+% Remove out-of-bound triggers
+out_of_bounds = plot_EEG_with_triggers(data_FT, trigs_not_during_stim);
+trigs_not_during_stim = setdiff(trigs_not_during_stim, out_of_bounds);
+
+% Create FieldTrip .trl structures
+time_before = 0.5;
+time_after  = 1;
+
+[trl_stim, ~]    = make_epoching_trial_cfg(trigs_during_stim/Fs, data_FT, time_before, time_after);
+[trl_no_stim, ~] = make_epoching_trial_cfg(trigs_not_during_stim/Fs, data_FT, time_before, time_after);
+
+% Add labels: 1 = stim, 2 = no stim
+trl_stim    = [trl_stim, ones(size(trl_stim,1), 1)];
+trl_no_stim = [trl_no_stim, 2 * ones(size(trl_no_stim,1), 1)];
+
+cfg = [];
+cfg.dataset = data_file;
+cfg.trl     = [trl_stim; trl_no_stim];
+
+% Remove out-of-bounds trials
+nSamples = size(data_FT.trial{1}, 2);
+cfg.trl  = cfg.trl(cfg.trl(:,1) >= 1 & cfg.trl(:,2) <= nSamples, :);
+
+% Epoch
+data_FT.cfg = cfg;
+data_epoched = ft_preprocessing(cfg);
+
+% Separate stim vs no stim
 cfg = [];
 cfg.trials = find(data_epoched.trialinfo == 1);
 data_stim = ft_selectdata(cfg, data_epoched);
 
-% No stim trials
 cfg.trials = find(data_epoched.trialinfo == 2);
 data_no_stim = ft_selectdata(cfg, data_epoched);
 
-%% [ongoing] Trying to clean stimulation sections and recover underlying trace 
+%% [9] Clean Stim Artifacts from Epoched Trials
+% this should only really apply to the stimulus trials - as the non
+% stimulus period trials should have any high frequency activity
+% ---------------------------------------------
 
 threshold    = 1000;
 pre_points   = 3;
 post_points  = 4;
 
-cleaned_trace = clean_stimulation_periods(trace, threshold, pre_points, post_points);
+cleaned_data = data_epoched;
+
+for trialIdx = 1:length(data_epoched.trial)
+    trial_data = data_epoched.trial{trialIdx};
+    for chanIdx = 1:size(trial_data,1)
+        trace = trial_data(chanIdx, :);
+        cleaned_trace = clean_stimulation_periods(trace, threshold, pre_points, post_points);
+        cleaned_data.trial{trialIdx}(chanIdx, :) = cleaned_trace;
+    end
+end
 
 
-%% [4] Separate data based on contacts with behavioural impairment vs all contacts in IFOF
+%% [extra] Separate by Anatomical Contact Groups
+% -------------------------------------------
 
-% contacts with behavioural impairments in IFOF
 behav_impairments = {'Am3', 'Am4', 'aIn4', 'aIn5', 'IFG4', 'IFG5', 'IFG6', 'IFG7'};
+all_in_IFOF = {'Am3', 'Am4', ...
+               'aIn3', 'aIn4', 'aIn5', 'aIn6', 'aIn7', ...
+               'LpSM3', 'LpSM4', ...
+               'LaC3', 'LaC4', 'LaC5', ...
+               'IFG2', 'IFG3', 'IFG4', 'IFG5', 'IFG6', ...
+               'mOF3', 'mOF4', 'mOF5', 'mOF6', 'mOF7', 'mOF8', 'mOF9'};
 
-% BARD contacts in IFOF
-all_in_IFOF      = {'Am3', 'Am4', ...
-                    'aIn3', 'aIn4', 'aIn5', 'aIn6', 'aIn7', ...
-                    'LpSM3', 'LpSM4', ...
-                    'LaC3', 'LaC4', 'LaC5', ...
-                    'IFG2', 'IFG3', 'IFG4', 'IFG5', 'IFG6', ...
-                    'mOF3', 'mOF4', 'mOF5', 'mOF6', 'mOF7', 'mOF8', 'mOF9'};
-
-% BARD contacts in AF?
-in_AF            = {'pC6', 'pC7'};
-
-% separate data into behavioural impaired IFOF electrodes and all IFOF electrodes
-cfg                  = [];
-cfg.channel          = behav_impairments;
+cfg = [];
+cfg.channel = behav_impairments;
 behav_impairments_data = ft_selectdata(cfg, data_epoched);
 
-cfg.channel          = all_in_IFOF;
-all_in_IFOF_data     = ft_selectdata(cfg, data_epoched);
+cfg.channel = all_in_IFOF;
+all_in_IFOF_data = ft_selectdata(cfg, data_epoched);

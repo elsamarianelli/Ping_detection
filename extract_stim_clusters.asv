@@ -1,5 +1,4 @@
 function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs, threshold, merge_gap_sec)
-    
     % trace           - raw EEG signal
     % timeVec         - time axis (same length as trace)
     % threshold       - amplitude threshold to detect stimulation periods
@@ -30,15 +29,15 @@ function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs
     % Binary mask: above threshold
     threshold = 20;
     over_thresh = trace_variability > threshold;
+    over_thresh_outofbounds = trace > 2500; 
+
+    % merge binary masks 
+    over_thresh = (over_thresh + over_thresh_outofbounds) > 0; 
+    
     % Merge short gaps between clusters
     merge_gap_samples = round(merge_gap_sec * Fs);
     over_thresh = imclose(over_thresh, ones(1, merge_gap_samples));
-    
-    % add the ones that are too stimulated for frequency to show up
-    over_thresh_outofbounds = trace > 2500; 
-    % merge binary masks 
-    over_thresh = (over_thresh + over_thresh_outofbounds) > 0; 
-    % 
+
     % Find start and end indices from logical array
     diff_over = diff([0, over_thresh, 0]);
     start_idx = find(diff_over == 1);
