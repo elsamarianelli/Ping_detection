@@ -1,32 +1,8 @@
 function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs, threshold, merge_gap_sec)
-%% Function to extract trigger times from audio recordings (ping detection)
-%  Elsa Marianelli, UCL (2025) zcbtetm@ucl.ac.uk - Edited by Dan Bush 
-%
-%  This function extracts the timestamps of ping-like audio triggers from a 
-%  provided audio file. It uses a template matching method based on the 
-%  spectrogram of a known trigger sound to identify peaks in the full audio.
-%
-%  Inputs:
-%  dataFile  - string, filename of the audio file (e.g., 'audio_vid_76.wav')
-%
-%  Outputs:
-%  trigs     - vector of trigger times (in seconds) corresponding to detected
-%              pings within the audio
-%
-%  Interactive steps:
-%  - Step 1: Set a power threshold interactively to detect pings.
-%  - Step 2: (Optional) Set a start time threshold to remove pre-task periods.
-%
-%  Additional behavior:
-%  - Option to save the detected trigger times as a CSV file (interactive prompt)
-%
-%  Notes:
-%  - Make sure the template ping audio ('actual_ping_shorter.wav') is available 
-%    in the same data directory.
-%  - The data directory (dataFold) is hard-coded and may need to be updated
-%    depending on the computer being used.
+% function to extract stimulaiton periods direct from EEG trace (for
+% comparison with those provdided in Davide Excel file) 
 
-
+% [1] get peri
     % Binary mask: above threshold
     threshold = 20;
     over_thresh = trace_variability > threshold;
@@ -38,7 +14,7 @@ function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs
     over_thresh_outofbounds = trace > 2500; 
     % merge binary masks 
     over_thresh = (over_thresh + over_thresh_outofbounds) > 0; 
-    % 
+    
     % Find start and end indices from logical array
     diff_over = diff([0, over_thresh, 0]);
     start_idx = find(diff_over == 1);
@@ -46,28 +22,6 @@ function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs
     stimTimes = [timeVec(start_idx)', timeVec(end_idx)'];
 
     artifact_matrix = [start_idx(:), end_idx(:)];
-   
-    % % Binary mask: above threshold
-    % over_thresh = trace > threshold;
-    % % Find start and end indices from logical array
-    % diff_over = diff([0, over_thresh, 0]);
-    % start_idx = find(diff_over == 1);
-    % end_idx   = find(diff_over == -1) - 1;
-    % 
-    % % Combine into artifact matrix for later use in interpolation funciton
-    % artifact_matrix = [start_idx(:), end_idx(:)];
-    % 
-    % % Merge short gaps between clusters
-    % merge_gap_samples = round(merge_gap_sec * Fs);
-    % over_thresh = imclose(over_thresh, ones(1, merge_gap_samples));
-    % 
-    % % Find start and end indices
-    % diff_over = diff([0, over_thresh, 0]);
-    % start_idx = find(diff_over == 1);
-    % end_idx   = find(diff_over == -1) - 1;
-    % 
-    % % Convert to times
-    % stimTimes = [timeVec(start_idx)', timeVec(end_idx)'];
 
     figure;
     plot(timeVec, trace, 'b'); hold on;

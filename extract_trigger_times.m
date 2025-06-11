@@ -24,13 +24,10 @@ function [trigs] = extract_trigger_times(dataFile)
 
 %% Set some parameters
 % dataFold        = 'D:\Data\Davide Project\';                % Data path 
-<<<<<<< HEAD
 dataFold        = '/Users/elsamarianelli/Documents/audio_pip_task'; % on laptop
 % dataFold        = 'C:\Users\Elsa Marianelli\Documents\GitHub\DAVIDE_data_and_docs';% on work computer 
-=======
 % dataFold        = '/Users/elsamarianelli/Documents/audio_pip_task'; % on laptop
-dataFold        = 'C:\Users\Elsa Marianelli\Documents\GitHub\DAVIDE_data_and_docs';% on work computer 
->>>>>>> 5dea06474fcf52970377bfad6ab35dd593bfc4c2
+% dataFold        = 'C:\Users\Elsa Marianelli\Documents\GitHub\DAVIDE_data_and_docs';% on work computer 
 % dataFold        = '/Users/elsamarianelli/Documents/Davide Project/DAVIDE_data_and_docs'; % laptop
 % dataFile        = 'audio_vid_76.wav';                       % Audio file
 trigFile        = 'actual_ping_shorter.wav';                % Template audio trigger

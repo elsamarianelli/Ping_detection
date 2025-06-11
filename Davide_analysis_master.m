@@ -46,16 +46,19 @@ file_path = 'Davide_Project/DAVIDE_data_and_docs/';
 stim_file = 'bard_2-20230301_114215-20240820_110340_WM_stim';
 stim_times_file = readtable(stim_file);
 
-% Read ping stim labels (during stim or not)
+% Read ping stim labels (during stim or not) - this doesn't have timing
+% info
 ping_stims = readtable('AM3_AM4');
 Stimulated = ping_stims.Stimulated;
 
-% Convert stim table to usable format (offset-adjusted)
+% Read Stimulation times 
 stim_table = extract_stim_times_from_table(stim_times_file, '11:41:49');
 
 %% [4] Trigger Detection from Audio Files
 % ---------------------------------------
 
+% gets trigger times from ping sounds during video, matched to EEG using
+% delay provided 
 trigTimes = [];
 for i = 1:length(audio)
     trigs = extract_trigger_times(audio{i});
@@ -65,21 +68,22 @@ end
 %% [5] Extract Stimulation Windows from EEG Trace
 % -----------------------------------------------
 
-trace_idx = 4;  % e.g. Am4
-threshold = 400;
-merge_gap_sec = 2;
+trace_idx = 4;     % Am3 = 4 ; Am4 = 4
+merge_gap_sec = 2; % time inbetween stimualtion peaks to merge 
 
 ex_trace = data_FT.trial{1}(trace_idx, :);
-timeVec  = data_FT.time{1};
+timeVec  = data_FT.time{1}; 
 
-[stimTimes, artifact_matrix] = extract_stim_clusters(ex_trace, timeVec, Fs, threshold, merge_gap_sec);
-save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
+[stimTimes, artifact_matrix] = extract_stim_clusters(ex_trace, timeVec, Fs, merge_gap_sec);
+save_trig_and_stim_times(trigTimes, stimTimes, EEG_code); % optional
 
-%% [6] Align Extracted Stim Windows with Log Times (for visual validation)
+%% [6] Align Extracted Stim Windows with excel times (for visual validation)
 % ------------------------------------------------------------------------
+% if they align correctly, can use either the excel times or the extracted
+% stimulaiton periods (however would recomment using the extracted ones
 
 % Estimate delay between extracted and logged stim
-first = stimTimes(6, 1);
+first = stimTimes(8, 1);
 match_with = stim_table.Start(2);
 delay_offset = first - match_with;
 
@@ -93,9 +97,13 @@ plot_trace_with_stim_sources(ex_trace, timeVec, stimTimes, stim_table_new)
 
 %% [7] Match Pings to Stim Windows
 % --------------------------------
-
+% matchFlags - 0 = trigger not during stimulation period
+%            - 1 = trigger during stimulation period           
 matchFlags = zeros(length(trigTimes), 1);
-stimTimes_new = stim_table_new{:, 1:2};
+
+stimTimes_new = (stim_table_new{:, 1:2}); % use excel stim times
+stimTimes_new(:,2) = stimTimes_new(:,2);
+%stimTimes_new = stimTimes;  % OR - use extracted from EEG trace
 
 for i = 1:length(trigTimes)
     for j = 1:size(stimTimes_new, 1)
@@ -109,13 +117,11 @@ end
 % Plot matches vs mismatches
 figure;
 hold on;
-
 % Patches for stim windows
 for i = 1:size(stimTimes_new,1)
     patch([stimTimes_new(i,1), stimTimes_new(i,2), stimTimes_new(i,2), stimTimes_new(i,1)], ...
-          [-1, -1, 1, 1], [1 0.8 0.8], 'EdgeColor', 'none', 'FaceAlpha', 1);
+          [-1, -1, 1, 1], [1 0.8 0.8], 'EdgeColor', 'none', 'FaceAlpha', .5);
 end
-
 % Plot pings
 stem(trigTimes(matchFlags==0), -1*ones(sum(matchFlags==0),1), 'b', 'filled');
 stem(trigTimes(matchFlags==1), -1*ones(sum(matchFlags==1),1), 'r', 'filled');
@@ -125,6 +131,9 @@ legend('Stim Window', 'No Match', 'Match');
 
 %% [8] Epoch Data into Stim and No-Stim Trials
 % --------------------------------------------
+% essentially different way of doing the same thing but in format for
+% epoching, can also replace stimTimes here with stim_table_new{:, 1:2} to
+% use excel spreadsheet times but I don't recommend
 
 % Get stim indices in samples
 stimSamples = arrayfun(@(s,e) round(s*Fs):round(e*Fs), ...
@@ -172,7 +181,42 @@ data_stim = ft_selectdata(cfg, data_epoched);
 cfg.trials = find(data_epoched.trialinfo == 2);
 data_no_stim = ft_selectdata(cfg, data_epoched);
 
-%% [9] Clean Stim Artifacts from Epoched Trials
+%% [9] Output data file format ...
+% ---------------------------------------------
+
+% Initialise structure
+Struct = struct();
+
+% Correct response (1 or 0 - trials x 1) 
+Struct.CorrectResponse = ping_stims.CorrectNamingOfItem;
+
+% Stimulation Intensity (1, 2, 3 or NaN - trials x 1)
+Struct.StimIntensity = ping_stims.StimIntensity;
+
+% [1] EEG Data: channels x time points x trials
+nTrials   = length(data_epoched.trial);
+nChannels = size(data_epoched.trial{1}, 1);
+nSamples  = size(data_epoched.trial{1}, 2);
+
+eegData = nan(nChannels, nSamples, nTrials);
+for i = 1:nTrials
+    eegData(:, :, i) = data_epoched.trial{i};
+end
+Struct.EEG = eegData;
+
+% [2] Stimulation Label (1 = during stimulation, 0 = not)
+Struct.StimLabel = double(data_epoched.trialinfo == 1);  % (trials x 1)
+
+% [Optional: Time vector per trial if needed]
+Struct.Time = data_epoched.time;  % cell array of time vectors for each trial
+
+% Save the structure
+save('Processed_EEG_Data.mat', 'Struct');
+
+
+
+
+%% [10] Clean Stim Artifacts from Epoched Trials
 % ---------------------------------------------
 
 threshold    = 1000;

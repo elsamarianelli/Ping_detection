@@ -39,59 +39,50 @@ ft_databrowser(cfg, data_FT);
 
 Fs = data_FT.fsample;  % Sampling frequency
 
-%% [3] Load Stim Tables and Extract Stimulation Times 
+%% [3] Load Stim Tables and Extract Stimulation Times
 % ---------------------------------------------------
 
 file_path = 'Davide_Project/DAVIDE_data_and_docs/';
 stim_file = 'bard_2-20230301_114215-20240820_110340_WM_stim';
 stim_times_file = readtable(stim_file);
 
-% Read ping stim labels (during stim or not) - not sure this is helpful
+% Read ping stim labels (during stim or not) - this doesn't have timing
+% info
 ping_stims = readtable('AM3_AM4');
 Stimulated = ping_stims.Stimulated;
 
-% Convert stim table to usable format (offset-adjusted)
+% Read Stimulation times 
 stim_table = extract_stim_times_from_table(stim_times_file, '11:41:49');
 
 %% [4] Trigger Detection from Audio Files
 % ---------------------------------------
 
-% Get with interactive plot
+% gets trigger times from ping sounds during video, matched to EEG using
+% delay provided 
 trigTimes = [];
 for i = 1:length(audio)
     trigs = extract_trigger_times(audio{i});
     trigTimes = [trigTimes, trigs + delay_time(i)];
 end
 
-% OR get presaved ones
-% trigTimes = [];
-% for i = 1:length(audio)
-%    file_name = [erase(audio{i}, '.wav') '-triggerTimes.csv'];
-%    trigTable    = readtable(filename); 
-%    trigTimes    = trigTable.TriggerTimes;
-%    trigTimes = [trigTimes, trigs + delay_time(i)];
-% end
-
 %% [5] Extract Stimulation Windows from EEG Trace
 % -----------------------------------------------
 
-trace_idx = 3;  % 3 = Am3, 4 = Am4 (see data_FT.label for more)
-merge_gap_sec = 2; % gap (in seconds) below which clusters are merged
+trace_idx = 4;     % Am3 = 4 ; Am4 = 4
+merge_gap_sec = 2; % time inbetween stimualtion peaks to merge 
 
 ex_trace = data_FT.trial{1}(trace_idx, :);
-timeVec  = data_FT.time{1};
+timeVec  = data_FT.time{1}; 
 
-[stimTimes, artifact_matrix] = extract_stim_clusters(ex_trace, timeVec, Fs, threshold, merge_gap_sec);
+[stimTimes, artifact_matrix] = extract_stim_clusters(ex_trace, timeVec, Fs, merge_gap_sec);
+save_trig_and_stim_times(trigTimes, stimTimes, EEG_code); % optional
 
-% option to save
-% save_trig_and_stim_times(trigTimes, stimTimes, EEG_code);
-
-%% [6] Align Extracted Stim Windows with Log Times (for visual validation)
+%% [6] Align Extracted Stim Windows with excel times (for visual validation)
 % ------------------------------------------------------------------------
+% if they align correctly, can use either the excel times or the extracted
+% stimulaiton periods (however would recomment using the extracted ones
 
-% Estimate delay between extracted and logged stim - need to set alignment
-% indices manually (here the 6th extracted stimulation time aligns with the
-% 2nd one from the excel file)
+% Estimate delay between extracted and logged stim
 first = stimTimes(8, 1);
 match_with = stim_table.Start(2);
 delay_offset = first - match_with;
@@ -106,10 +97,56 @@ plot_trace_with_stim_sources(ex_trace, timeVec, stimTimes, stim_table_new)
 
 %% [7] Match Pings to Stim Windows
 % --------------------------------
-matchFlags = matchPingstoStimWindows(trigTimes, stim_table_new);
+% matchFlags - 0 = trigger not during stimulation period
+%            - 1 = trigger during stimulation period           
+matchFlags = zeros(length(trigTimes), 1);
 
-%% [8] Epoch Data into triggers which occured Stim and No-Stim Trials
+stimTimes_new = (stim_table_new{:, 1:2}); % use excel stim times
+stimTimes_new(:,2) = stimTimes_new(:,2);
+%stimTimes_new = stimTimes;  % OR - use extracted from EEG trace
+
+for i = 1:length(trigTimes)
+    for j = 1:size(stimTimes_new, 1)
+        if trigTimes(i) >= stimTimes_new(j,1) && trigTimes(i) <= stimTimes_new(j,2)
+            matchFlags(i) = 1;
+            break;
+        end
+    end
+end
+
+% Plot matches vs mismatches
+figure;
+hold on;
+% Patches for stim windows
+for i = 1:size(stimTimes_new,1)
+    patch([stimTimes_new(i,1), stimTimes_new(i,2), stimTimes_new(i,2), stimTimes_new(i,1)], ...
+          [-1, -1, 1, 1], [1 0.8 0.8], 'EdgeColor', 'none', 'FaceAlpha', .5);
+end
+% Plot pings
+stem(trigTimes(matchFlags==0), -1*ones(sum(matchFlags==0),1), 'b', 'filled');
+stem(trigTimes(matchFlags==1), -1*ones(sum(matchFlags==1),1), 'r', 'filled');
+title('Ping Times vs. Stimulation Matches');
+xlabel('Time (s)'); ylabel('Match');
+legend('Stim Window', 'No Match', 'Match');
+
+
+%% Output data file format ...
+% initialise structure
+Struct = struct();
+
+% Correct response (1 or 0 - trials x 1) 
+Struct.CorrectResponse = ping_stims.CorrectNamingOfItem;
+% Stimulation Intensity (1, 2, 3 or NaN - trials x 1)
+Struct.StimIntensity = ping_stims.StimIntensity;
+
+% EEG data (channels x time bins x trials)
+% Stimulation (1 for stim or 0 for no stim - trials x 1)
+
+%% [8] Epoch Data into Stim and No-Stim Trials
 % --------------------------------------------
+% essentially different way of doing the same thing but in format for
+% epoching, can also replace stimTimes here with stim_table_new{:, 1:2} to
+% use excel spreadsheet times but I don't recommend
 
 % Get stim indices in samples
 stimSamples = arrayfun(@(s,e) round(s*Fs):round(e*Fs), ...
@@ -141,9 +178,6 @@ cfg = [];
 cfg.dataset = data_file;
 cfg.trl     = [trl_stim; trl_no_stim];
 
-% select channels of interest 
-cfg.channel    = {'Am3' 'Am4'};
-
 % Remove out-of-bounds trials
 nSamples = size(data_FT.trial{1}, 2);
 cfg.trl  = cfg.trl(cfg.trl(:,1) >= 1 & cfg.trl(:,2) <= nSamples, :);
@@ -161,8 +195,6 @@ cfg.trials = find(data_epoched.trialinfo == 2);
 data_no_stim = ft_selectdata(cfg, data_epoched);
 
 %% [9] Clean Stim Artifacts from Epoched Trials
-% this should only really apply to the stimulus trials - as the non
-% stimulus period trials should have any high frequency activity
 % ---------------------------------------------
 
 threshold    = 1000;
@@ -180,8 +212,7 @@ for trialIdx = 1:length(data_epoched.trial)
     end
 end
 
-
-%% [extra] Separate by Anatomical Contact Groups
+%% [10] Separate by Anatomical Contact Groups
 % -------------------------------------------
 
 behav_impairments = {'Am3', 'Am4', 'aIn4', 'aIn5', 'IFG4', 'IFG5', 'IFG6', 'IFG7'};

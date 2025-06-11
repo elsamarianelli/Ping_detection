@@ -1,44 +1,38 @@
-function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs, threshold, merge_gap_sec)
-%% Function to extract trigger times from audio recordings (ping detection)
-%  Elsa Marianelli, UCL (2025) zcbtetm@ucl.ac.uk - Edited by Dan Bush 
-%
-%  This function extracts the timestamps of ping-like audio triggers from a 
-%  provided audio file. It uses a template matching method based on the 
-%  spectrogram of a known trigger sound to identify peaks in the full audio.
-%
-%  Inputs:
-%  dataFile  - string, filename of the audio file (e.g., 'audio_vid_76.wav')
-%
-%  Outputs:
-%  trigs     - vector of trigger times (in seconds) corresponding to detected
-%              pings within the audio
-%
-%  Interactive steps:
-%  - Step 1: Set a power threshold interactively to detect pings.
-%  - Step 2: (Optional) Set a start time threshold to remove pre-task periods.
-%
-%  Additional behavior:
-%  - Option to save the detected trigger times as a CSV file (interactive prompt)
-%
-%  Notes:
-%  - Make sure the template ping audio ('actual_ping_shorter.wav') is available 
-%    in the same data directory.
-%  - The data directory (dataFold) is hard-coded and may need to be updated
-%    depending on the computer being used.
+function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs, merge_gap_sec)
+% function to extract stimulaiton periods direct from EEG trace (for
+% comparison with those provdided in Davide Excel file) 
 
-
+% [1] get periods with very high frequency
     % Binary mask: above threshold
+    % Parameters
+    window_size = 5;  % number of past points to average
+    n = length(trace);
+    
+    % Preallocate variability array
+    trace_variability = nan(1, n);  % first 'window_size' values will be NaN
+    
+    % Compute variability
+    for t = (window_size + 1):n
+        mean_prev = mean(trace(t - window_size:t - 1));
+        trace_variability(t) = abs(trace(t) - mean_prev);
+    end
+
+    % get periods over variability threshold
     threshold = 20;
     over_thresh = trace_variability > threshold;
+
     % Merge short gaps between clusters
     merge_gap_samples = round(merge_gap_sec * Fs);
     over_thresh = imclose(over_thresh, ones(1, merge_gap_samples));
-    
+
+ % [2] get periods where stimulation is so high its just a block... don't
+ % get caught in high frequency ^
     % add the ones that are too stimulated for frequency to show up
     over_thresh_outofbounds = trace > 2500; 
-    % merge binary masks 
+
+ % [3] merge binary masks 
     over_thresh = (over_thresh + over_thresh_outofbounds) > 0; 
-    % 
+    
     % Find start and end indices from logical array
     diff_over = diff([0, over_thresh, 0]);
     start_idx = find(diff_over == 1);
@@ -46,8 +40,7 @@ function [stimTimes, artifact_matrix] = extract_stim_clusters(trace, timeVec, Fs
     stimTimes = [timeVec(start_idx)', timeVec(end_idx)'];
 
     artifact_matrix = [start_idx(:), end_idx(:)];
-   
-
+% [4] visualise
     figure;
     plot(timeVec, trace, 'b'); hold on;
 
